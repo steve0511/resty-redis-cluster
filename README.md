@@ -14,7 +14,7 @@ https://github.com/cuiweixie/lua-resty-redis-cluster.   Thanks for this is a goo
 
 4. Support hashtag. Just give you key like name{tag}
 
-5. Support read from slave like Redisson/lettuce, both usual command and pipeline. 
+5. Support read from slave like Redisson/lettuce, both usual command and pipeline. While enable slave node read, resty-redis-cluster will randomly pickup a node mapping to the request key.
 
 6. Support online resharding of redis cluster(both for usual command and pipeline. resty-redis-cluster will handle the #MOVED signal by re-cache the slot mapping and retrying. resty-redis-cluster will handle the #ASK signal by retrying with asking to redirection target nodes
 
@@ -25,7 +25,119 @@ https://github.com/cuiweixie/lua-resty-redis-cluster.   Thanks for this is a goo
    
    2) we must refresh slot cache mapping in case any redis nodes connection failure, otherwise we will not get the latest slot cache mapping and always get failure. Refer to Jedis, same behaviour to referesh cache mapping while any unknown connection issue. 
    
-   3) We must handle ASK redirection in usual commands
+   3) We must handle ASK redirection in usual/MOVED commands
    
-   4) Pipeline must also handle ASK/MOVED singal.
+   4) Pipeline must also handle MOVED signal with refreshing slot cache mapping and retry.
+
+### Not support now
+
+1. MSET, MGET operations 
+
+2. transactions operations: MULTI DISCARD EXEC WATCH 
+
+3. auto-discovery for new adding slave nodes, unless retrigger new slot mapping cached refresh
+
+4. While enable slave node reading, if slave -> master link is down(maybe still under sync and recovery), resty-redis-cluster will not filter these nodes out. This is because cluster slots command will not filter them out.
+   
+### Sample usage
+
+1. Use normal commands:
+
+local config = {
+    name = "testCluster",
+    serv_list = {
+        { ip = "127.0.0.1", port = 7001 },
+        { ip = "127.0.0.1", port = 7002 },
+        { ip = "127.0.0.1", port = 7003 },
+        { ip = "127.0.0.1", port = 7004 },
+        { ip = "127.0.0.1", port = 7005 },
+        { ip = "127.0.0.1", port = 7006 }
+    },
+    keepalive_timeout = 55000,
+    keepalive_cons = 1000,
+    connection_timout = 1000
+}
+
+local redis_cluster = require "rediscluster"
+local red_c = redis_cluster:new(config)
+
+local v, err = red_c:get("name")
+if err then
+    ngx.log(ngx.ERR, "err: ", err)
+else
+    ngx.say(v)
+end
+
+2. Use pipeline:
+
+local cjson = require "cjson"
+
+local config = {
+    name = "testCluster",
+    serv_list = {
+        { ip = "127.0.0.1", port = 7001 },
+        { ip = "127.0.0.1", port = 7002 },
+        { ip = "127.0.0.1", port = 7003 },
+        { ip = "127.0.0.1", port = 7004 },
+        { ip = "127.0.0.1", port = 7005 },
+        { ip = "127.0.0.1", port = 7006 }
+    },
+    keepalive_timeout = 55000,
+    keepalive_cons = 1000,
+    connection_timout = 1000
+}
+
+local redis_cluster = require "rediscluster"
+local red_c = redis_cluster:new(config)
+
+
+red_c:init_pipeline()
+red_c:get("name")
+red_c:get("name1")
+red_c:get("name2")
+
+local res, err = red_c:commit_pipeline()
+
+if not res then
+    ngx.log(ngx.ERR, "err: ", err)
+else
+    ngx.say(cjson.encode(res))
+end
+
+3. enable slave node read:
+
+local cjson = require "cjson"
+
+local config = {
+    name = "testCluster",
+    enableSlaveRead = true,
+    serv_list = {
+        { ip = "127.0.0.1", port = 7001 },
+        { ip = "127.0.0.1", port = 7002 },
+        { ip = "127.0.0.1", port = 7003 },
+        { ip = "127.0.0.1", port = 7004 },
+        { ip = "127.0.0.1", port = 7005 },
+        { ip = "127.0.0.1", port = 7006 }
+    },
+    keepalive_timeout = 55000,
+    keepalive_cons = 1000,
+    connection_timout = 1000
+}
+
+local redis_cluster = require "rediscluster"
+local red_c = redis_cluster:new(config)
+
+
+red_c:init_pipeline()
+red_c:zrange("item100")
+red_c:zrange("item200")
+red_c:zrange("item300")
+
+local res, err = red_c:commit_pipeline()
+
+if not res then
+    ngx.log(ngx.ERR, "err: ", err)
+else
+    ngx.say(cjson.encode(res))
+end
    
