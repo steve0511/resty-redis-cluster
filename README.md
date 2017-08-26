@@ -139,6 +139,43 @@ else
 end
 ```
 
+4. hashtag
+```lua
+local cjson = require "cjson"
+
+local config = {
+    name = "testCluster",
+    enableSlaveRead = true,
+    serv_list = {
+        { ip = "127.0.0.1", port = 7001 },
+        { ip = "127.0.0.1", port = 7002 },
+        { ip = "127.0.0.1", port = 7003 },
+        { ip = "127.0.0.1", port = 7004 },
+        { ip = "127.0.0.1", port = 7005 },
+        { ip = "127.0.0.1", port = 7006 }
+    },
+    keepalive_timeout = 55000,
+    keepalive_cons = 1000,
+    connection_timout = 1000
+}
+
+local redis_cluster = require "rediscluster"
+local red_c = redis_cluster:new(config)
+
+
+red_c:init_pipeline()
+red_c:get("item100:sub1{100}")
+red_c:get("item100:sub2{100}")
+red_c:get("item300:sub3{100}")
+
+local res, err = red_c:commit_pipeline()
+
+if not res then
+    ngx.log(ngx.ERR, "err: ", err)
+else
+    ngx.say(cjson.encode(res))
+end
+```
 
 ### Not support now
 
