@@ -124,18 +124,11 @@ local config = {
 local redis_cluster = require "rediscluster"
 local red_c = redis_cluster:new(config)
 
-
-red_c:init_pipeline()
-red_c:zrange("item100")
-red_c:zrange("item200")
-red_c:zrange("item300")
-
-local res, err = red_c:commit_pipeline()
-
-if not res then
+local v, err = red_c:get("name")
+if err then
     ngx.log(ngx.ERR, "err: ", err)
 else
-    ngx.say(cjson.encode(res))
+    ngx.say(v)
 end
 ```
 
