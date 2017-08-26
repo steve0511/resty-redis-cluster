@@ -3,10 +3,10 @@ Openresty lua client for redis cluster.
 
 This client would support the usual access request to redis cluster.Currently openresty has no good client which can completely
 support our project requirements, so I develop one. The client has some reference with cuiweixie's lua client:
-https://github.com/cuiweixie/lua-resty-redis-cluster.   Thanks for this is a good baseline for me to start!
+https://github.com/cuiweixie/lua-resty-redis-cluster. Thanks for this is a good baseline for me to start!
 
 ### feature list
-1. resty-redis-cluster will cache slot->redis node mapping relationship, and support to calculate slot of key by CRC16, then access data by the cached mapping. while initializing, only 1 request per working will initial the slot mapping.
+1. resty-redis-cluster will cache slot->redis node mapping relationship, and support to calculate slot of key by CRC16, then access data by the cached mapping. The way we call CRC16 and caching is mostly same with https://github.com/cuiweixie/lua-resty-redis-cluster. While initializing, only 1 request per working will initial the slot mapping.
 
 2. Support usual redis access and most command. 
 
