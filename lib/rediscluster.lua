@@ -1,18 +1,10 @@
---
--- Created by IntelliJ IDEA.
--- User: stevexu
--- Date: 8/25/17
--- Time: 10:39 AM
--- To change this template use File | Settings | File Templates.
---
-
 local ffi = require 'ffi'
 
 local cjson = require "cjson"
 
 local setmetatable = setmetatable
 local tostring = tostring
-local MAGIC_TRY = 5
+local DEFUALT_MAX_REDIRECTION = 5
 
 local DEFUALT_KEEPALIVE_TIMEOUT = 55000
 local DEFAULT_KEEPALIVE_CONS = 1000
@@ -77,11 +69,11 @@ local common_cmds = {
     "append", --[["auth",]] --[["bgrewriteaof",]]
     --[["bgsave",]] --[["blpop",]] --[["brpop",]]
     --[["brpoplpush",]] --[["config", ]] --[["dbsize",]]
-    --[["debug", ]] "decr", "decrby",
-    --[["del",]] --[["discard",           "echo",]]
+    --[["debug", ]] "decr", "decrby", "del",
+    --[["discard",           "echo",]]
     --[["eval",]] "exec", "exists",
-    --[["expire",            "expireat",          "flushall",
-    "flushdb",]] "get", "getbit",
+    --[["flushall",
+    "flushdb",]] "get", "getbit", "expire", "expireat",
     "getrange", "getset", "hdel",
     "hexists", "hget", "hgetall",
     "hincrby", "hkeys", "hlen",
@@ -104,8 +96,8 @@ local common_cmds = {
     --[["select",]] "set", "setbit",
     "setex", "setnx", "setrange",
     --[["shutdown",          "sinter",            "sinterstore",
-    "sismember",         "slaveof",           "slowlog",]]
-    "smembers", "smove", "sort",
+        "slaveof",           "slowlog",]]
+    "smembers", "smove", "sort", "sismember",
     "spop", "srandmember", "srem",
     "strlen", --[["subscribe",]] "sunion",
     "sunionstore", --[["sync",]] "ttl",
@@ -123,6 +115,9 @@ local slot_cache = {}
 local function try_hosts_slots(self, serv_list)
     local errors = {}
     local config = self.config
+    if #serv_list <1 then
+        return nil, "failed to fetch slots, serv_list config is empty"
+    end
     for i = 1, #serv_list do
         local ip = serv_list[i].ip
         local port = serv_list[i].port
@@ -166,7 +161,6 @@ function _M.fetch_slots(self)
     end
 end
 
-
 function _M.init_slots(self)
     if slot_cache[self.config.name] then
         return
@@ -206,7 +200,6 @@ function _M.new(self, config)
 end
 
 math.randomseed(os.time())
-
 
 local function pick_node(self, serv_list, slot, magicRadomSeed)
     local host
@@ -303,7 +296,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
     key = tostring(key)
     local slot = redis_slot(key)
 
-    for k = 1, MAGIC_TRY do
+    for k = 1, config.max_redirection or DEFUALT_MAX_REDIRECTION do
 
         if k > 1 then
             --ngx.log(ngx.NOTICE, "handle retry attempts:" .. k .. " for cmd:" .. cmd .. " key:" .. key)
@@ -319,8 +312,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         local ip, port, slave, err
 
         if targetIp ~= nil and targetPort ~= nil then
-            --asking redirection should only happens at master nodes, if exception,
-            --the worst case is maximum retry with everytime return moved signal
+            --asking redirection should only happens at master nodes
             ip, port, slave = targetIp, targetPort, false
         else
             ip, port, slave, err = pick_node(self, serv_list, slot)
@@ -402,7 +394,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
             return nil, connerr
         end
     end
-    return nil, "failed to execute command, reaches maximum retry attempts"
+    return nil, "failed to execute command, reaches maximum redirection attempts"
 end
 
 local function _do_cmd(self, cmd, key, ...)
@@ -420,7 +412,7 @@ end
 
 local function constructFinalPipelineRes(self, map_ret, map)
     --construct final result with origin index
-    local ret = {}
+    local finalret = {}
     for k, v in pairs(map_ret) do
         local ins_reqs = map[k].reqs
         local res = v
@@ -434,7 +426,7 @@ local function constructFinalPipelineRes(self, map_ret, map)
                 if err then
                     return nil, err
                 else
-                    ret[ins_reqs[i].origin_index] = askres
+                    finalret[ins_reqs[i].origin_index] = askres
                 end
             elseif hasMovedSignal(res[i]) then
                 --ngx.log(ngx.NOTICE, "handle moved signal for cmd:" .. ins_reqs[i]["cmd"] .. " key:" .. ins_reqs[i]["key"])
@@ -447,14 +439,14 @@ local function constructFinalPipelineRes(self, map_ret, map)
                 if err then
                     return nil, err
                 else
-                    ret[ins_reqs[i].origin_index] = movedres
+                    finalret[ins_reqs[i].origin_index] = movedres
                 end
             else
-                ret[ins_reqs[i].origin_index] = res[i]
+                finalret[ins_reqs[i].origin_index] = res[i]
             end
         end
     end
-    return ret
+    return finalret
 end
 
 local function hasClusterFailSignalInPipeline(res)
@@ -471,10 +463,11 @@ local function hasClusterFailSignalInPipeline(res)
 end
 
 local function generateMagicSeed(self)
-    --We don't want req will be divided to all channels, eg. if we have 3*3 cluster(3 master 2 replicas) we want pick up specific 3 for 1 requests
+    --For pipeline,We don't want req will be divided to all channels, eg. if we have 3*3 cluster(3 master 2 replicas) we want pick up specific 3 for 1 requests
     --given a seed far more than the number of cluster nodes
     if self.config.enableSlaveRead then
-        return math.random(1000, 10000)
+        local nodeCount = #self.config.serv_list
+        return math.random(nodeCount, nodeCount*10)
     else
         return nil
     end
@@ -483,7 +476,6 @@ end
 function _M.init_pipeline(self)
     self._reqs = {}
 end
-
 
 function _M.commit_pipeline(self)
     if not self._reqs or #self._reqs == 0 then return
@@ -536,29 +528,29 @@ function _M.commit_pipeline(self)
         local port = v.port
         local ins_reqs = v.reqs
         local slave = v.slave
-        local ins = redis:new()
-        ins:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
-        local ok, err = ins:connect(ip, port)
+        local redis_client = redis:new()
+        redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        local ok, err = redis_client:connect(ip, port)
         if slave then
             --set readonly
-            local ok, err = ins:readonly()
+            local ok, err = redis_client:readonly()
             if not ok then
                 self:fetch_slots()
                 return nil, err
             end
         end
         if ok then
-            ins:init_pipeline()
+            redis_client:init_pipeline()
             for i = 1, #ins_reqs do
                 local req = ins_reqs[i]
                 if #req.args > 0 then
-                    ins[req.cmd](ins, req.key, unpack(req.args))
+                    redis_client[req.cmd](redis_client, req.key, unpack(req.args))
                 else
-                    ins[req.cmd](ins, req.key)
+                    redis_client[req.cmd](redis_client, req.key)
                 end
             end
-            local res, err = ins:commit_pipeline()
-            ins:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
+            local res, err = redis_client:commit_pipeline()
+            redis_client:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
                 config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
             if err then
                 --There might be node fail, we should also refresh slot cache
