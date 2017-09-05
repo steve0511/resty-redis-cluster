@@ -317,7 +317,6 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         else
             ip, port, slave, err = pick_node(self, serv_list, slot)
             if err then
-                ngx.log(ngx.ERR, "pickup node failed, will return failed for this request, meanwhile refereshing slotcache " .. err)
                 self:fetch_slots()
                 return nil, err
             end
@@ -385,7 +384,6 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
                 end
             end
             if not needToRetry then
-                --ngx.log(ngx.NOTICE, "res:" .. cjson.encode(res))
                 return res, err
             end
         else
@@ -502,7 +500,6 @@ function _M.commit_pipeline(self)
 
         local ip, port, slave, err = pick_node(self, slot_item.serv_list, slot, magicRandomPickupSeed)
         if err then
-            ngx.log(ngx.ERR, "pickup node failed, will return failed for this request, meanwhile refereshing slotcache " .. err)
             -- We must empty local reference to slots cache, otherwise there will be memory issue while
             -- coroutine swich happens(eg. ngx.sleep, cosocket), very important!
             slots = nil
