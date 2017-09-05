@@ -12,16 +12,16 @@ https://github.com/cuiweixie/lua-resty-redis-cluster. Thanks for this is a good 
 
 3. Support pipeline operation. in case key is seperated in multiple nodes, resty-redis-cluster will organize and divide the slot which in same target nodes, then commit them with several pipeline.
 
-4. Support hashtag. Just give you key like name{tag}
+4. Support hashtag. Just give your key like name{tag}
 
-5. Support read from slave like Redisson/lettuce, both usual command and pipeline. While enable slave node read, resty-redis-cluster will randomly pickup a node mapping to the request key.
+5. Support read from slave node by readonly mode, both usual command and pipeline. While enable slave node read, resty-redis-cluster will randomly pickup a node which is mapped to the request key.
 
 6. Support online resharding of redis cluster(both for usual command and pipeline. resty-redis-cluster will handle the #MOVED signal by re-cache the slot mapping and retrying. resty-redis-cluster will handle the #ASK signal by retrying with asking to redirection target nodes
 
 7. Support error handling for the different failure scenario of redis cluster. (etc.Singel slave, master fail, cluster down)
 
 8. fix some critical issues of https://github.com/cuiweixie/lua-resty-redis-cluster. 
-   1) memory leak issues while high throughput. Cosocket operation will casue the suspend and swith of coroutine, so there would be multiple requests still have reference to the big slot mapping cache. This will cause LUAJIT VM crashed.
+   1) memory leak issues while there is high throughput. Socket request will cause the suspend and swith of coroutine, so there would be multiple requests still have reference to the big slot mapping cache. This will cause LUAJIT VM crashed.
    
    2) we must refresh slot cache mapping in case any redis nodes connection failure, otherwise we will not get the latest slot cache mapping and always get failure. Refer to Jedis, same behaviour to referesh cache mapping while any unknown connection issue. 
    
