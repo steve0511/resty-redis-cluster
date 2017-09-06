@@ -163,7 +163,7 @@ local red_c = redis_cluster:new(config)
 red_c:init_pipeline()
 red_c:get("item100:sub1{100}")
 red_c:get("item100:sub2{100}")
-red_c:get("item300:sub3{100}")
+red_c:get("item100:sub3{100}")
 
 local res, err = red_c:commit_pipeline()
 
@@ -180,7 +180,7 @@ end
 
 2. transactions operations: MULTI DISCARD EXEC WATCH 
 
-3. auto-discovery for new adding slave nodes, unless retrigger new slot mapping cached refresh
+3. auto-discovery for new adding slave nodes(only slave,no master), unless retrigger new slot mapping cached refresh
 
 4. While enable slave node reading, if slave -> master link is down(maybe still under sync and recovery), resty-redis-cluster will not filter these nodes out. This is because cluster slots command will not filter them out.
    
