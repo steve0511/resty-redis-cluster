@@ -58,6 +58,7 @@ local function redis_slot(str)
 end
 
 local _M = {}
+
 local mt = { __index = _M }
 
 local redis = require "redis"
@@ -65,6 +66,7 @@ local redis = require "redis"
 local resty_lock = require "resty.lock"
 
 redis.add_commands("cluster")
+
 local common_cmds = {
     "append", --[["auth",]] --[["bgrewriteaof",]]
     --[["bgsave",]] --[["blpop",]] --[["brpop",]]
@@ -86,8 +88,8 @@ local common_cmds = {
     "lset", "ltrim", --[["mget"]]
     --[["monitor", "move", "mset"]]
     --[[["msetnx", "multi",]] --[["object",]]
-    --[["persist",]] --[["ping",]] --[["psubscribe",]]
-    --[[ "publish",           "punsubscribe",      "quit",]]
+    --[["persist",]] --[["ping",]]
+    --[["quit",]]
     --[["randomkey",         "rename",            "renamenx",]]
     "rpop", --[["rpoplpush",]] "rpush",
     "rpushx", "sadd", --[["save",]]
@@ -99,9 +101,9 @@ local common_cmds = {
         "slaveof",           "slowlog",]]
     "smembers", "smove", "sort", "sismember",
     "spop", "srandmember", "srem",
-    "strlen", --[["subscribe",]] "sunion",
+    "strlen", "sunion",
     "sunionstore", --[["sync",]] "ttl",
-    "type", --[["unsubscribe",]] --[["unwatch",
+    "type", --[["unwatch",
     "watch",]] "zadd", "zcard",
     "zcount", "zincrby", "zinterstore",
     "zrange", "zrangebyscore", "zrank",
@@ -109,6 +111,12 @@ local common_cmds = {
     "zrevrange", "zrevrangebyscore", "zrevrank",
     "zscore", --[["zunionstore",    "evalsha"]]
 }
+
+--Don't support pubsub yet, actually in redis cluster pub sub works without slot.
+--we can simply use normal resty redis to connect specific node.
+--[[local subscribe_cmds = {
+    "psubscribe","publish", "subscribe"
+}]]
 
 local slot_cache = {}
 
@@ -193,6 +201,12 @@ function _M.init_slots(self)
 end
 
 function _M.new(self, config)
+    if not config.name then
+        return nil, " redis cluster config name is empty"
+    end
+    if not config.serv_list or #config.serv_list < 1 then
+        return nil, " redis cluster config serv_list is empty"
+    end
     local inst = { config = config }
     inst = setmetatable(inst, mt)
     inst:init_slots()
@@ -317,6 +331,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         else
             ip, port, slave, err = pick_node(self, serv_list, slot)
             if err then
+                ngx.log(ngx.ERR, "pickup node failed, will return failed for this request, meanwhile refereshing slotcache " .. err)
                 self:fetch_slots()
                 return nil, err
             end
@@ -395,6 +410,15 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
     return nil, "failed to execute command, reaches maximum redirection attempts"
 end
 
+
+local function generateMagicSeed(self)
+    --For pipeline, We don't want request to be forwarded to all channels, eg. if we have 3*3 cluster(3 master 2 replicas) we
+    --alway want pick up specific 3 nodes for pipeline requests, instead of 9.
+    --Currently we simply use (num of allnode)%count as a randomly fetch. Might consider a better way in the future.
+    local nodeCount = #self.config.serv_list
+    return math.random(nodeCount)
+end
+
 local function _do_cmd(self, cmd, key, ...)
     if self._reqs then
         local args = { ... }
@@ -406,7 +430,6 @@ local function _do_cmd(self, cmd, key, ...)
     local res, err = handleCommandWithRetry(self, nil, nil, false, cmd, key, ...)
     return res, err
 end
-
 
 local function constructFinalPipelineRes(self, map_ret, map)
     --construct final result with origin index
@@ -460,16 +483,6 @@ local function hasClusterFailSignalInPipeline(res)
     return false
 end
 
-local function generateMagicSeed(self)
-    --For pipeline,We don't want req will be divided to all channels, eg. if we have 3*3 cluster(3 master 2 replicas) we want pick up specific 3 for 1 requests
-    --given a seed far more than the number of cluster nodes
-    if self.config.enableSlaveRead then
-        local nodeCount = #self.config.serv_list
-        return math.random(nodeCount, nodeCount*10)
-    else
-        return nil
-    end
-end
 
 function _M.init_pipeline(self)
     self._reqs = {}

@@ -174,14 +174,17 @@ else
 end
 ```
 
-### Not support now
+### Limitation
 
-1. MSET, MGET operations 
+1. Doesn't support MSET, MGET operations yet
 
-2. transactions operations: MULTI DISCARD EXEC WATCH 
+2. Doesn't support transactions operations: MULTI DISCARD EXEC WATCH
 
-3. auto-discovery for new adding slave nodes(only slave,no master), unless retrigger new slot mapping cached refresh
+3. Doesn't support pub sub support. Actually redis cluster didn't check slot for pub sub commands, so using normal resty redis client to conenct with specific node in a cluster still works.
 
-4. While enable slave node reading, if slave -> master link is down(maybe still under sync and recovery), resty-redis-cluster will not filter these nodes out. This is because cluster slots command will not filter them out.
+4. auto-discovery for cases adding new slave (but without new master), unless retrigger new slot mapping cached refresh
+
+5. While enable slave node reading, if slave -> master link is down(maybe still under sync and recovery), resty-redis-cluster will not filter these nodes out.
+   This is because cluster slots command will not filter them out.
    
    
