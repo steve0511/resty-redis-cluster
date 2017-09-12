@@ -180,7 +180,7 @@ end
 
 2. Doesn't support transactions operations: MULTI DISCARD EXEC WATCH
 
-3. Doesn't support pub sub support. Actually redis cluster didn't check slot for pub sub commands, so using normal resty redis client to conenct with specific node in a cluster still works.
+3. Doesn't support pub sub. Actually redis cluster didn't check slot for pub sub commands, so using normal resty redis client to conenct with specific node in a cluster still works.
 
 4. auto-discovery for cases adding new slave (but without new master), unless retrigger new slot mapping cached refresh
 
