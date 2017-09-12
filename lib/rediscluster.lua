@@ -1,3 +1,4 @@
+---- Copyright (C) Xu Hui (steve)
 local ffi = require 'ffi'
 
 local cjson = require "cjson"
