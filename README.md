@@ -29,7 +29,13 @@ https://github.com/cuiweixie/lua-resty-redis-cluster. Thanks for this is a good 
    
    4) Pipeline must also handle MOVED signal with refreshing slot cache mapping and retry.
 
+### installation
 
+1. please compile and generate redis_slot.so from redis_slot.c (can done by gcc)
+
+2. please configure redis_slot.so and rediscluster.lua at lualib like:
+   lua_package_path "/path/lualib/?.lua;";
+   lua_package_cpath "/path/lualib/?.so;";
 
 ### Sample usage
 
