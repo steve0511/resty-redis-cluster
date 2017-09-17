@@ -1,7 +1,7 @@
 ---- Copyright (C) Xu Hui (steve)
 local ffi = require 'ffi'
 
-local cjson = require "cjson"
+--local cjson = require "cjson"
 
 local setmetatable = setmetatable
 local tostring = tostring
