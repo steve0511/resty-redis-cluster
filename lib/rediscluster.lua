@@ -138,7 +138,7 @@ function _M.init_slots(self)
         return
     end
 
-    local elapsed, err = lock:lock("redis_cluster_slot")
+    local elapsed, err = lock:lock("redis_cluster_slot_"..self.config.name)
     if not elapsed then
         ngx.log(ngx.ERR, "failed to acquire the lock in initialization slot cache: ", err)
         return
