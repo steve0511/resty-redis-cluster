@@ -1,4 +1,3 @@
----- Copyright (C) Xu Hui (steve)
 local ffi = require 'ffi'
 
 --local cjson = require "cjson"
@@ -49,7 +48,7 @@ local function parseKey(keyStr)
     local rightTagSingalIndex = string.find(keyStr, "}", 0)
     if leftTagSingalIndex and rightTagSingalIndex then
         --parse hashtag
-        return keyStr.sub(keyStr, leftTagSingalIndex+1, rightTagSingalIndex-1)
+        return keyStr.sub(keyStr, leftTagSingalIndex + 1, rightTagSingalIndex - 1)
     else
         return keyStr
     end
@@ -66,7 +65,7 @@ local _M = {}
 
 local mt = { __index = _M }
 
-local redis = require "resty.redis"
+local redis = require "redis"
 
 local resty_lock = require "resty.lock"
 
@@ -76,7 +75,7 @@ local slot_cache = {}
 local function try_hosts_slots(self, serv_list)
     local errors = {}
     local config = self.config
-    if #serv_list <1 then
+    if #serv_list < 1 then
         return nil, "failed to fetch slots, serv_list config is empty"
     end
     for i = 1, #serv_list do
@@ -105,7 +104,7 @@ local function try_hosts_slots(self, serv_list)
                         end
                     end
                 end
-                ngx.log(ngx.NOTICE, "finished initializing slotcache...")
+                --ngx.log(ngx.NOTICE, "finished initializing slotcache...")
                 slot_cache[self.config.name] = slots
                 return true, nil
             else
@@ -138,7 +137,7 @@ function _M.init_slots(self)
         return
     end
 
-    local elapsed, err = lock:lock("redis_cluster_slot_"..self.config.name)
+    local elapsed, err = lock:lock("redis_cluster_slot_" .. self.config.name)
     if not elapsed then
         ngx.log(ngx.ERR, "failed to acquire the lock in initialization slot cache: ", err)
         return
@@ -223,7 +222,8 @@ local function parseAskSignal(res)
                 return nil, nil
             end
             return matched[1], matched[2]
-        else
+        end
+        if type(res) == "table" then
             for i = 1, #res do
                 if type(res[i]) == "string" and string.sub(res[i], 1, 3) == "ASK" then
                     local matched = ngx.re.match(res[i], [[^ASK [^ ]+ ([^:]+):([^ ]+)]], "jo", nil, askHostAndPort)
@@ -244,9 +244,11 @@ local function hasMovedSignal(res)
         if type(res) == "string" and string.sub(res, 1, 5) == "MOVED" then
             return true
         else
-            for i = 1, #res do
-                if type(res[i]) == "string" and string.sub(res[i], 1, 5) == "MOVED" then
-                    return true
+            if type(res) == "table" then
+                for i = 1, #res do
+                    if type(res[i]) == "string" and string.sub(res[i], 1, 5) == "MOVED" then
+                        return true
+                    end
                 end
             end
         end
@@ -396,7 +398,7 @@ local function constructFinalPipelineRes(self, node_res_map, node_req_map)
             --deal with redis cluster ask redirection
             local askHost, askPort = parseAskSignal(res[i])
             if askHost ~= nil and askPort ~= nil then
-                --ngx.log(ngx.NOTICE, "handle ask signal for cmd:" .. reqs[i]["cmd"] .. " key:" .. reqs[i]["key"] .. " target host:"..askHost.." target port:"..askPort)
+                --ngx.log(ngx.NOTICE, "handle ask signal for cmd:" .. reqs[i]["cmd"] .. " key:" .. reqs[i]["key"] .. " target host:" .. askHost .. " target port:" .. askPort)
                 local askres, err = handleCommandWithRetry(self, askHost, askPort, true, reqs[i]["cmd"], reqs[i]["key"], unpack(reqs[i]["args"]))
                 if err then
                     return nil, err
@@ -408,7 +410,7 @@ local function constructFinalPipelineRes(self, node_res_map, node_req_map)
                 if needToFetchSlots then
                     -- if there is multiple signal for moved, we just need to fetch slot cache once, and do retry.
                     self:fetch_slots()
-                    needToFetchSlots =false
+                    needToFetchSlots = false
                 end
                 local movedres, err = handleCommandWithRetry(self, nil, nil, false, reqs[i]["cmd"], reqs[i]["key"], unpack(reqs[i]["args"]))
                 if err then
@@ -427,7 +429,7 @@ end
 
 local function hasClusterFailSignalInPipeline(res)
     for i = 1, #res do
-        if res[i] ~= ngx.null then
+        if res[i] ~= ngx.null and type(res[i]) == "table" then
             for j = 1, #res[i] do
                 if type(res[i][j]) == "string" and string.sub(res[i][j], 1, 11) == "CLUSTERDOWN" then
                     return true
@@ -554,16 +556,18 @@ function _M.cancel_pipeline(self)
 end
 
 -- dynamic cmd
-setmetatable(_M, {__index = function(self, cmd)
-    local method =
-    function (self, ...)
-        return _do_cmd(self, cmd, ...)
-    end
+setmetatable(_M, {
+    __index = function(self, cmd)
+        local method =
+        function(self, ...)
+            return _do_cmd(self, cmd, ...)
+        end
 
-    -- cache the lazily generated method in our
-    -- module table
-    _M[cmd] = method
-    return method
-end})
+        -- cache the lazily generated method in our
+        -- module table
+        _M[cmd] = method
+        return method
+    end
+})
 
 return _M
