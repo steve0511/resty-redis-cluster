@@ -116,6 +116,12 @@ end
 
 3. enable slave node read:
 
+   Note: Currently enableSlaveRead is only limited in pure read scenario.
+   We don't support mixed read and write scenario(distingush read, write operation) in single config set with enableSlaveRead now.
+   If your scenario is mixed with write operation, please disable the option.
+
+   Also, you can isolate pure read scenaro into another config set.
+
 ```lua
 local cjson = require "cjson"
 
