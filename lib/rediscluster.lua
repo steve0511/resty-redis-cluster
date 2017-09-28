@@ -66,7 +66,7 @@ local _M = {}
 
 local mt = { __index = _M }
 
-local redis = require "redis"
+local redis = require "resty.redis"
 
 local resty_lock = require "resty.lock"
 
