@@ -1,6 +1,6 @@
 local ffi = require 'ffi'
-
---local cjson = require "cjson"
+local redis = require "resty.redis"
+local resty_lock = require "resty.lock"
 
 local setmetatable = setmetatable
 local tostring = tostring
@@ -64,10 +64,6 @@ end
 local _M = {}
 
 local mt = { __index = _M }
-
-local redis = require "redis"
-
-local resty_lock = require "resty.lock"
 
 local slot_cache = {}
 
