@@ -6,15 +6,15 @@ support our project requirements, so I develop one. The client has some referenc
 https://github.com/cuiweixie/lua-resty-redis-cluster. Thanks for this is a good baseline for me to start!
 
 ### feature list
-1. resty-redis-cluster will cache slot->redis node mapping relationship, and support to calculate slot of key by CRC16, then access data by the cached mapping. The way we call CRC16 and caching is mostly same with https://github.com/cuiweixie/lua-resty-redis-cluster. While initializing, only 1 request per working will initial the slot mapping.
+1. resty-redis-cluster will cache slot->redis node mapping relationship, and support to calculate slot of key by CRC16, then access data by the cached mapping. The way we call CRC16 and caching is mostly same with https://github.com/cuiweixie/lua-resty-redis-cluster. 
 
-2. Support usual redis access and most command. 
+2. Support usual redis cluster access and most command. 
 
-3. Support pipeline operation. in case key is seperated in multiple nodes, resty-redis-cluster will organize and divide the slot which in same target nodes, then commit them with several pipeline.
+3. Support pipe-line operation. in case key is seperated in multiple nodes, resty-redis-cluster will organize the slot which in same target nodes into groups, then commit them with several pipeline group.
 
 4. Support hashtag. Just give your key like name{tag}
 
-5. Support read from slave node by readonly mode, both usual command and pipeline. While enable slave node read, resty-redis-cluster will randomly pickup a node which is mapped to the request key.
+5. Support read from slave node by readonly mode, both usual command and pipeline. While enable slave node read, resty-redis-cluster will randomly pickup a node which is mapped to the request key, no matter it's master or slave.
 
 6. Support online resharding of redis cluster(both for usual command and pipeline. resty-redis-cluster will handle the #MOVED signal by re-cache the slot mapping and retrying. resty-redis-cluster will handle the #ASK signal by retrying with asking to redirection target nodes
 
