@@ -200,9 +200,9 @@ end
 
 3. Doesn't support pub sub. Actually redis cluster didn't check slot for pub sub commands, so using normal resty redis client to conenct with specific node in a cluster still works.
 
-4. Limitation only for turn on enable slave read: If we need to discover new slave node(but without adding new master), must retrigger new slot mapping cache refresh, otherwise slot mapping still record the last version of node tables.(easiest way is rebooting nginx nodes, also schedule to retrigger new slot mapping cache is a good way.)
+4. Limitation only for turn on enable slave read: If we need to discover new slave node(but without adding new master), must retrigger new slot mapping cache refresh, otherwise slot mapping still record the last version of node tables.(easiest way is rebooting nginx nodes)
 
-5. Limitation only for turn on enable slave read, if slave -> master link is down(maybe still under sync and recovery), resty-redis-cluster will not filter these nodes out. Thus, read from slave may return unexpected response. Suggest always catch the response parsing exception while enable slave read. 
+5. Limitation only for turn on enable slave read: If slave -> master link is down(maybe still under sync and recovery), resty-redis-cluster will not filter these nodes out. Thus, read from slave may return unexpected response. Suggest always catch the response parsing exception while enable slave read. 
    This is because client depends on cluster slots command.
    
    
