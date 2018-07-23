@@ -74,17 +74,27 @@ local function try_hosts_slots(self, serv_list)
     if #serv_list < 1 then
         return nil, "failed to fetch slots, serv_list config is empty"
     end
+
     for i = 1, #serv_list do
         local ip = serv_list[i].ip
         local port = serv_list[i].port
         local redis_client = redis:new()
         local ok, err = redis_client:connect(ip, port)
         redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
-        if ok then
-            local slots_info, err = redis_client:cluster("slots")
-            redis_client:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
-                config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
 
+        if ok then
+            local count, err, slots_info
+            count, err = redis_client:get_reused_times()
+            if type(config.auth) == "string" and count == 0 then 
+                _, err = redis_client:auth(config.auth)
+            end 
+
+            if not err then 
+                slots_info, err = redis_client:cluster("slots")
+                redis_client:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
+                                           config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
+            end 
+            
             if slots_info then
                 local slots = {}
                 for i = 1, #slots_info do
