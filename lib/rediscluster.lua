@@ -67,6 +67,22 @@ local mt = { __index = _M }
 
 local slot_cache = {}
 
+local function checkAuth(self, redis_client)
+    if type(self.config.auth) == "string" then
+        local count, err = redis_client:get_reused_times()
+        if count == 0 then
+            _, err = redis_client:auth(self.config.auth)
+        end
+        if not err then
+            return true, nil
+        else
+            return nil, err
+        end
+    else
+        return true, nil
+    end
+end
+
 
 local function try_hosts_slots(self, serv_list)
     local errors = {}
@@ -81,6 +97,11 @@ local function try_hosts_slots(self, serv_list)
         local ok, err = redis_client:connect(ip, port)
         redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
         if ok then
+            local authok, autherr = checkAuth(self, redis_client)
+            if autherr then
+                table.insert(errors, autherr)
+                return nil, errors
+            end
             local slots_info, err = redis_client:cluster("slots")
             redis_client:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
                 config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
@@ -291,6 +312,10 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         local ok, connerr = redis_client:connect(ip, port)
 
         if ok then
+            local authok, autherr = checkAuth(self, redis_client)
+            if autherr then
+                return nil, autherr
+            end
             if slave then
                 --set readonly
                 local ok, err = redis_client:readonly()
@@ -498,6 +523,12 @@ function _M.commit_pipeline(self)
         local redis_client = redis:new()
         redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
         local ok, err = redis_client:connect(ip, port)
+
+        local authok, autherr = checkAuth(self, redis_client)
+        if autherr then
+            return nil, autherr
+        end
+
         if slave then
             --set readonly
             local ok, err = redis_client:readonly()
