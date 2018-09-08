@@ -105,7 +105,8 @@ if err then
     ngx.log(ngx.ERR, "err: ", err)
 else
     ngx.say(v)
-end  
+end 
+```
 
 2. Use pipeline:
 
