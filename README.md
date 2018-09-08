@@ -11,7 +11,7 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 ### feature list
 1. resty-redis-cluster will cache slot->redis node mapping relationship, and support to calculate slot of key by CRC16, then access data by the cached mapping. The way we calculate CRC16 and caching is somewhat similar with https://github.com/cuiweixie/lua-resty-redis-cluster. 
 
-2. Support usual redis cluster access and most command. 
+2. Support usual redis cluster access and most command, support authentication
 
 3. Support pipe-line operation. in case key is seperated in multiple nodes, resty-redis-cluster will organize the slot which in same target nodes into groups, then commit them with several pipeline group.
 
@@ -64,7 +64,7 @@ local config = {
     keepalive_timeout = 60000,              --redis connection pool idle timeout
     keepalive_cons = 1000,                  --redis connection pool size
     connection_timout = 1000,               --timeout while connecting
-    max_redirection = 5                     --maximum retry attempts for redirection
+    max_redirection = 5,                    --maximum retry attempts for redirection
 }
 
 local redis_cluster = require "rediscluster"
@@ -77,6 +77,35 @@ else
     ngx.say(v)
 end
 ```
+  authentication: 
+  
+```lua
+local config = {
+    name = "testCluster",                   --rediscluster name
+    serv_list = {                           --redis cluster node list(host and port),
+        { ip = "127.0.0.1", port = 7001 },
+        { ip = "127.0.0.1", port = 7002 },
+        { ip = "127.0.0.1", port = 7003 },
+        { ip = "127.0.0.1", port = 7004 },
+        { ip = "127.0.0.1", port = 7005 },
+        { ip = "127.0.0.1", port = 7006 }
+    },
+    keepalive_timeout = 60000,              --redis connection pool idle timeout
+    keepalive_cons = 1000,                  --redis connection pool size
+    connection_timout = 1000,               --timeout while connecting
+    max_redirection = 5,                    --maximum retry attempts for redirection,
+    auth = "pass"                           --set password while setting auth
+}
+
+local redis_cluster = require "rediscluster"
+local red_c = redis_cluster:new(config)
+
+local v, err = red_c:get("name")
+if err then
+    ngx.log(ngx.ERR, "err: ", err)
+else
+    ngx.say(v)
+end  
 
 2. Use pipeline:
 
