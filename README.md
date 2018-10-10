@@ -11,7 +11,7 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 ### feature list
 1. resty-redis-cluster will cache slot->redis node mapping relationship, and support to calculate slot of key by CRC16, then access data by the cached mapping. The way we calculate CRC16 and caching is somewhat similar with https://github.com/cuiweixie/lua-resty-redis-cluster. 
 
-2. Support usual redis cluster access and most command, support authentication
+2. Support usual redis cluster access and most command
 
 3. Support pipe-line operation. in case key is seperated in multiple nodes, resty-redis-cluster will organize the slot which in same target nodes into groups, then commit them with several pipeline group.
 
@@ -31,6 +31,10 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
    3) We must handle ASK redirection in usual/MOVED commands
    
    4) Pipeline must also handle MOVED signal with refreshing slot cache mapping and retry.
+
+9.  Support authentication.
+
+10. Also verified working properly in AWS elasticache.
 
 ### installation
 
