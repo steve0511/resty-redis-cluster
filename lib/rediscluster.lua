@@ -5,8 +5,8 @@ local resty_lock = require "resty.lock"
 local setmetatable = setmetatable
 local tostring = tostring
 
-local DEFUALT_MAX_REDIRECTION = 5
-local DEFUALT_KEEPALIVE_TIMEOUT = 55000
+local DEFAULT_MAX_REDIRECTION = 5
+local DEFAULT_KEEPALIVE_TIMEOUT = 55000
 local DEFAULT_KEEPALIVE_CONS = 1000
 local DEFAULT_CONNECTION_TIMEOUT = 1000
 
@@ -103,8 +103,13 @@ local function try_hosts_slots(self, serv_list)
                 return nil, errors
             end
             local slots_info, err = redis_client:cluster("slots")
-            redis_client:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
-                config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
+
+            local keepaliveok, keepaliveerr = redis_client:set_keepalive(config.keepalive_timeout
+                    or DEFAULT_KEEPALIVE_TIMEOUT, config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
+            if not keepaliveok then
+                table.insert(errors, keepaliveerr)
+                return nil, errors
+            end
 
             if slots_info then
                 local slots = {}
@@ -216,7 +221,7 @@ local function pick_node(self, serv_list, slot, magicRadomSeed)
         else
             slave = false
         end
-        --ngx.log(ngx.NOTICE, "pickup node: ", cjson.encode(serv_list[index]))
+        --ngx.log(ngx.NOTICE, "pickup node: ", c(serv_list[index]))
     else
         host = serv_list[1].ip
         port = serv_list[1].port
@@ -280,7 +285,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
     key = tostring(key)
     local slot = redis_slot(key)
 
-    for k = 1, config.max_redirection or DEFUALT_MAX_REDIRECTION do
+    for k = 1, config.max_redirection or DEFAULT_MAX_REDIRECTION do
 
         if k > 1 then
             --ngx.log(ngx.NOTICE, "handle retry attempts:" .. k .. " for cmd:" .. cmd .. " key:" .. key)
@@ -337,8 +342,13 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
             local needToRetry = false
 
             local res, err = redis_client[cmd](redis_client, key, ...)
-            redis_client:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
-                config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
+
+            local keepaliveok, keepaliveerr = redis_client:set_keepalive(config.keepalive_timeout
+                    or DEFAULT_KEEPALIVE_TIMEOUT, config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
+            if not keepaliveok then
+                return nil, keepaliveerr
+            end
+
             if err then
                 if string.sub(err, 1, 5) == "MOVED" then
                     --ngx.log(ngx.NOTICE, "find MOVED signal, trigger retry for normal commands, cmd:" .. cmd .. " key:" .. key)
@@ -548,8 +558,13 @@ function _M.commit_pipeline(self)
                 end
             end
             local res, err = redis_client:commit_pipeline()
-            redis_client:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
-                config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
+
+            local keepaliveok, keepaliveerr = redis_client:set_keepalive(config.keepalive_timeout
+                    or DEFAULT_KEEPALIVE_TIMEOUT, config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
+            if not keepaliveok then
+                return nil, keepaliveerr
+            end
+
             if err then
                 --There might be node fail, we should also refresh slot cache
                 self:fetch_slots()
