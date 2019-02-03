@@ -34,7 +34,9 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 
 9.  Support authentication.
 
-10. Also verified working properly in AWS elasticache.
+10. Support eval command with zero or one key
+
+11. Also verified working properly in AWS elasticache.
 
 ### installation
 
@@ -226,6 +228,36 @@ if not res then
     ngx.log(ngx.ERR, "err: ", err)
 else
     ngx.say(cjson.encode(res))
+end
+```
+
+5. eval
+
+```lua
+local config = {
+    name = "testCluster",                   --rediscluster name
+    serv_list = {                           --redis cluster node list(host and port),
+        { ip = "127.0.0.1", port = 7001 },
+        { ip = "127.0.0.1", port = 7002 },
+        { ip = "127.0.0.1", port = 7003 },
+        { ip = "127.0.0.1", port = 7004 },
+        { ip = "127.0.0.1", port = 7005 },
+        { ip = "127.0.0.1", port = 7006 }
+    },
+    keepalive_timeout = 60000,              --redis connection pool idle timeout
+    keepalive_cons = 1000,                  --redis connection pool size
+    connection_timout = 1000,               --timeout while connecting
+    max_redirection = 5,                    --maximum retry attempts for redirection
+}
+
+local redis_cluster = require "rediscluster"
+local red_c = redis_cluster:new(config)
+local step = 2
+local v, err = red_c:eval("return redis.call('incrby',KEYS[1],ARGV[1])",1,"counter",step)
+if err then
+    ngx.log(ngx.ERR, "err: ", err)
+else
+    ngx.say(v)
 end
 ```
 
