@@ -5,8 +5,8 @@ local resty_lock = require "resty.lock"
 local setmetatable = setmetatable
 local tostring = tostring
 
-local DEFUALT_MAX_REDIRECTION = 5
-local DEFUALT_KEEPALIVE_TIMEOUT = 55000
+local DEFAULT_MAX_REDIRECTION = 5
+local DEFAULT_KEEPALIVE_TIMEOUT = 55000
 local DEFAULT_KEEPALIVE_CONS = 1000
 local DEFAULT_CONNECTION_TIMEOUT = 1000
 
@@ -83,6 +83,14 @@ local function checkAuth(self, redis_client)
     end
 end
 
+local function releaseConnection(red, config)
+    local ok,err = red:set_keepalive(config.keepalive_timeout
+            or DEFAULT_KEEPALIVE_TIMEOUT, config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
+    if not ok then
+        ngx.log(ngx.ERR,"set keepalive failed:", err)
+    end
+end
+
 
 local function try_hosts_slots(self, serv_list)
     local errors = {}
@@ -103,9 +111,6 @@ local function try_hosts_slots(self, serv_list)
                 return nil, errors
             end
             local slots_info, err = redis_client:cluster("slots")
-            redis_client:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
-                config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
-
             if slots_info then
                 local slots = {}
                 for i = 1, #slots_info do
@@ -123,6 +128,7 @@ local function try_hosts_slots(self, serv_list)
                 end
                 --ngx.log(ngx.NOTICE, "finished initializing slotcache...")
                 slot_cache[self.config.name] = slots
+                releaseConnection(redis_client, config)
                 return true, nil
             else
                 table.insert(errors, err)
@@ -216,7 +222,7 @@ local function pick_node(self, serv_list, slot, magicRadomSeed)
         else
             slave = false
         end
-        --ngx.log(ngx.NOTICE, "pickup node: ", cjson.encode(serv_list[index]))
+        --ngx.log(ngx.NOTICE, "pickup node: ", c(serv_list[index]))
     else
         host = serv_list[1].ip
         port = serv_list[1].port
@@ -280,7 +286,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
     key = tostring(key)
     local slot = redis_slot(key)
 
-    for k = 1, config.max_redirection or DEFUALT_MAX_REDIRECTION do
+    for k = 1, config.max_redirection or DEFAULT_MAX_REDIRECTION do
 
         if k > 1 then
             --ngx.log(ngx.NOTICE, "handle retry attempts:" .. k .. " for cmd:" .. cmd .. " key:" .. key)
@@ -337,12 +343,11 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
             local needToRetry = false
 
             local res, err = redis_client[cmd](redis_client, key, ...)
-            redis_client:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
-                config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
             if err then
                 if string.sub(err, 1, 5) == "MOVED" then
                     --ngx.log(ngx.NOTICE, "find MOVED signal, trigger retry for normal commands, cmd:" .. cmd .. " key:" .. key)
                     --if retry with moved, we will not asking to specific ip,port anymore
+                    releaseConnection(redis_client, config)
                     targetIp = nil
                     targetPort = nil
                     self:fetch_slots()
@@ -350,6 +355,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
 
                 elseif string.sub(err, 1, 3) == "ASK" then
                     --ngx.log(ngx.NOTICE, "handle asking for normal commands, cmd:" .. cmd .. " key:" .. key)
+                    releaseConnection(redis_client, config)
                     if asking then
                         --Should not happen after asking target ip,port and still return ask, if so, return error.
                         return nil, "nested asking redirection occurred, client cannot retry "
@@ -365,7 +371,6 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
 
                 elseif string.sub(err, 1, 11) == "CLUSTERDOWN" then
                     return nil, "Cannot executing command, cluster status is failed!"
-
                 else
                     --There might be node fail, we should also refresh slot cache
                     self:fetch_slots()
@@ -373,6 +378,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
                 end
             end
             if not needToRetry then
+                releaseConnection(redis_client, config)
                 return res, err
             end
         else
@@ -548,8 +554,6 @@ function _M.commit_pipeline(self)
                 end
             end
             local res, err = redis_client:commit_pipeline()
-            redis_client:set_keepalive(config.keepalive_timeout or DEFUALT_KEEPALIVE_TIMEOUT,
-                config.keepalive_cons or DEFAULT_KEEPALIVE_CONS)
             if err then
                 --There might be node fail, we should also refresh slot cache
                 self:fetch_slots()
@@ -559,7 +563,7 @@ function _M.commit_pipeline(self)
             if hasClusterFailSignalInPipeline(res) then
                 return nil, "Cannot executing pipeline command, cluster status is failed!"
             end
-
+            releaseConnection(redis_client, config)
             node_res_map[k] = res
         else
             --There might be node fail, we should also refresh slot cache
