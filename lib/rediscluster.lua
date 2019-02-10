@@ -341,8 +341,12 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
             end
 
             local needToRetry = false
-
-            local res, err = redis_client[cmd](redis_client, key, ...)
+            local res, err
+            if cmd == "eval" then
+                res, err = redis_client[cmd](redis_client, ...)
+            else
+                res, err = redis_client[cmd](redis_client, key, ...)
+            end
             if err then
                 if string.sub(err, 1, 5) == "MOVED" then
                     --ngx.log(ngx.NOTICE, "find MOVED signal, trigger retry for normal commands, cmd:" .. cmd .. " key:" .. key)
@@ -586,12 +590,33 @@ function _M.cancel_pipeline(self)
     self._reqs = nil
 end
 
+local function _do_eval_cmd(self, ...)
+--[[
+eval command usage: 
+eval(script, 1, key, arg1, arg2 ...)
+eval(script, 0, arg1, arg2 ...)
+]]
+    local args = {...}
+    local keys_num = args[2]
+    if type(keys_num) ~= "number" then
+        return nil, "Cannot execute eval without keys number"
+    end
+    if keys_num > 1 then
+        return nil, "Cannot execute eval with more than one keys for redis cluster" 
+    end
+    local key = args[3] or "no_key"
+    return _do_cmd(self, "eval", key, ...)
+end
 -- dynamic cmd
 setmetatable(_M, {
     __index = function(self, cmd)
         local method =
         function(self, ...)
-            return _do_cmd(self, cmd, ...)
+            if cmd == "eval" then
+                return _do_eval_cmd(self, ...)
+            else
+                return _do_cmd(self, cmd, ...)
+            end
         end
 
         -- cache the lazily generated method in our
