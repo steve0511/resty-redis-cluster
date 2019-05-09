@@ -1,11 +1,9 @@
-local ffi = require 'ffi'
 local redis = require "resty.redis"
 local resty_lock = require "resty.lock"
+local xmodem = require "resty.xmodem"
 local setmetatable = setmetatable
 local tostring = tostring
 local string = string
-local io = io
-local package = package
 local type = type
 local table = table
 local ngx = ngx
@@ -13,6 +11,10 @@ local math = math
 local rawget = rawget
 local pairs = pairs
 local unpack = unpack
+local ipairs = ipairs
+local tonumber = tonumber
+local match = string.match
+local char = string.char
 
 
 local DEFAULT_MAX_REDIRECTION = 5
@@ -20,39 +22,6 @@ local DEFAULT_MAX_CONNECTION_ATTEMPTS = 3
 local DEFAULT_KEEPALIVE_TIMEOUT = 55000
 local DEFAULT_KEEPALIVE_CONS = 1000
 local DEFAULT_CONNECTION_TIMEOUT = 1000
-
-
-ffi.cdef [[
-    int lua_redis_crc16(char *key, int keylen);
-]]
-
---load from path, otherwise we should load from LD_LIBRARY_PATH by
---export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:your_lib_path
-local function load_shared_lib(so_name)
-    local string_gmatch = string.gmatch
-    local string_match = string.match
-    local io_open = io.open
-    local io_close = io.close
-
-    local cpath = package.cpath
-
-    for k, _ in string_gmatch(cpath, "[^;]+") do
-        local fpath = string_match(k, "(.*/)")
-        fpath = fpath .. so_name
-
-        local f = io_open(fpath)
-        if f ~= nil then
-            io_close(f)
-            return ffi.load(fpath)
-        end
-    end
-end
-
-
-local clib = load_shared_lib("librestyredisslot.so")
-if not clib then
-    ngx.log(ngx.ERR, "can not load librestyredisslot library")
-end
 
 
 local function parseKey(keyStr)
@@ -67,18 +36,26 @@ local function parseKey(keyStr)
 end
 
 
-local function redis_slot(str)
-    str = parseKey(str)
-    return clib.lua_redis_crc16(ffi.cast("char *", str), #str)
-end
-
-
 local _M = {}
 
 local mt = { __index = _M }
 
 local slot_cache = {}
+local master_nodes = {}
 
+local cmds_for_all_master = {
+    ["flushall"] = true,
+    ["flushdb"] = true
+}
+
+local cluster_invalid_cmds = {
+    ["config"] = true,
+    ["shutdown"] = true
+}
+
+local function redis_slot(str)
+    return xmodem.redis_crc(parseKey(str))
+end
 local function checkAuth(self, redis_client)
     if type(self.config.auth) == "string" then
         local count, err = redis_client:get_reused_times()
@@ -106,6 +83,13 @@ local function releaseConnection(red, config)
     end
 end
 
+local function split(s, delimiter)
+    local result = {};
+    for m in (s..delimiter):gmatch("(.-)"..delimiter) do
+        table.insert(result, m);
+    end
+    return result;
+end
 
 local function try_hosts_slots(self, serv_list)
     local errors = {}
@@ -164,13 +148,35 @@ local function try_hosts_slots(self, serv_list)
                 --ngx.log(ngx.NOTICE, "finished initializing slotcache...")
                 slot_cache[self.config.name] = slots
                 slot_cache[self.config.name .. "serv_list"] = servers
-                releaseConnection(redis_client, config)
-                return true, nil
             else
                 table.insert(errors, err)
             end
+            -- cache master nodes
+            local nodes_res, nerr = redis_client:cluster("nodes")
+            if nodes_res then
+                local nodes_info = split(nodes_res, char(10))
+                for _, node in ipairs(nodes_info) do
+                    local node_info = split(node, " ")
+                    if #node_info > 2 then
+                        local is_master = match(node_info[3], "master") ~= nil
+                        if is_master then
+                            local ip_port = split(split(node_info[2], "@")[1], ":")
+                            table.insert(master_nodes, {
+                                ip = ip_port[1],
+                                port = tonumber(ip_port[2])
+                            })
+                        end
+                    end
+                end
+            else
+                table.insert(errors, nerr)
+            end
+            releaseConnection(redis_client, config)
         else
             table.insert(errors, err)
+        end
+        if #errors == 0 then
+            return true, nil
         end
     end
     return nil, errors
@@ -194,25 +200,28 @@ function _M.fetch_slots(self)
 
     local ok, errors = try_hosts_slots(self, serv_list_combined)
     if errors then
-        ngx.log(ngx.ERR, "failed to fetch slots: ", table.concat(errors, ";"))
+        local err = "failed to fetch slots: " .. table.concat(errors, ";")
+        ngx.log(ngx.ERR, err)
+        return nil, err
     end
 end
 
 
 function _M.init_slots(self)
     if slot_cache[self.config.name] then
-        return
+        -- already initialized
+        return true
     end
     local lock, err = resty_lock:new("redis_cluster_slot_locks")
     if not lock then
         ngx.log(ngx.ERR, "failed to create lock in initialization slot cache: ", err)
-        return
+        return nil, err
     end
 
     local elapsed, err = lock:lock("redis_cluster_slot_" .. self.config.name)
     if not elapsed then
         ngx.log(ngx.ERR, "failed to acquire the lock in initialization slot cache: ", err)
-        return
+        return nil, err
     end
 
     if slot_cache[self.config.name] then
@@ -220,14 +229,24 @@ function _M.init_slots(self)
         if not ok then
             ngx.log(ngx.ERR, "failed to unlock in initialization slot cache: ", err)
         end
-        return
+        -- already initialized
+        return true
     end
 
-    self:fetch_slots()
+    local _, errs = self:fetch_slots()
+    if errs then
+        local ok, err = lock:unlock()
+        if not ok then
+            ngx.log(ngx.ERR, "failed to unlock in initialization slot cache:", err)
+        end
+        return nil, errs
+    end
     local ok, err = lock:unlock()
     if not ok then
         ngx.log(ngx.ERR, "failed to unlock in initialization slot cache:", err)
     end
+    -- initialized
+    return true
 end
 
 
@@ -239,11 +258,14 @@ function _M.new(self, config)
     if not config.serv_list or #config.serv_list < 1 then
         return nil, " redis cluster config serv_list is empty"
     end
-    
+
 
     local inst = { config = config }
     inst = setmetatable(inst, mt)
-    inst:init_slots()
+    local _, err = inst:init_slots()
+    if err then
+        return nil, err
+    end
     return inst
 end
 
@@ -403,6 +425,8 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
             else
                 res, err = redis_client[cmd](redis_client, key, ...)
             end
+            local cjson = require "cjson"
+            print('vinayak ' .. cjson.encode(res))
             if err then
                 if string.sub(err, 1, 5) == "MOVED" then
                     --ngx.log(ngx.NOTICE, "find MOVED signal, trigger retry for normal commands, cmd:" .. cmd .. " key:" .. key)
@@ -463,14 +487,38 @@ local function generateMagicSeed(self)
     return math.random(nodeCount)
 end
 
+local function _do_cmd_master(self, cmd, key, ...)
+    local errors = {}
+    for _, master in ipairs(master_nodes) do
+        local redis_client = redis:new()
+        redis_client:set_timeout(self.config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        local ok, err = redis_client:connect(master.ip, master.port)
+        if ok then
+            ok, err = redis_client[cmd](redis_client, key, ...)
+        end
+        if err then
+            table.insert(errors, err)
+        end
+        releaseConnection(redis_client, self.config)
+    end
+    return #errors == 0, table.concat(errors, ";")
+end
 
 local function _do_cmd(self, cmd, key, ...)
+    if cluster_invalid_cmds[cmd] == true then
+        return nil, "command not supported"
+    end
+
     local _reqs = rawget(self, "_reqs")
     if _reqs then
         local args = { ... }
         local t = { cmd = cmd, key = key, args = args }
         table.insert(_reqs, t)
         return
+    end
+
+    if cmds_for_all_master[cmd] then
+        return _do_cmd_master(self, cmd, key, ...)
     end
 
     local res, err = handleCommandWithRetry(self, nil, nil, false, cmd, key, ...)

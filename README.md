@@ -45,16 +45,13 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 
 1. please compile and generate librestyredisslot.so from redis_slot.c (can done by gcc)
 
-2. please add librestyredisslot.so and rediscluster.lua at lualib, Also please add library:lua-resty-redis and lua-resty-lock
-   
+2. please add xmodem.lua and rediscluster.lua at lualib, Also please add library:lua-resty-redis and lua-resty-lock
+
    nginx.conf like:
 
    lua_package_path "/path/lualib/?.lua;";
    lua_package_cpath "/path/lualib/?.so;";
 
-3. nginx.conf add config:
-
-   lua_shared_dict redis_cluster_slot_locks 100k;
 
 ### Sample usage
 
@@ -162,8 +159,8 @@ end
 
 3. enable slave node read:
 
-   Note: Currently enableSlaveRead is only limited in pure read scenario.
-   We don't support mixed read and write scenario(distingush read, write operation) in single config set with enableSlaveRead now.
+   Note: Currently enable_slave_read is only limited in pure read scenario.
+   We don't support mixed read and write scenario(distingush read, write operation) in single config set with enable_slave_read now.
    If your scenario is mixed with write operation, please disable the option.
 
    Also, you can isolate pure read scenaro into another config set.
@@ -173,7 +170,7 @@ local cjson = require "cjson"
 
 local config = {
     name = "testCluster",
-    enableSlaveRead = true,
+    enable_slave_read = true,
     serv_list = {
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
@@ -206,7 +203,7 @@ local cjson = require "cjson"
 
 local config = {
     name = "testCluster",
-    enableSlaveRead = true,
+    enable_slave_read = true,
     serv_list = {
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },

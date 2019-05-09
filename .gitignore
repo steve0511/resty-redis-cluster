@@ -33,3 +33,7 @@ Thumbs.db
 #c
 *.so
 *.o
+
+luacov*
+*.out
+t/servroot

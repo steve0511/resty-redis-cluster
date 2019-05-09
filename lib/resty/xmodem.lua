@@ -1,11 +1,29 @@
-#include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include "redis_slot.h"
+--
+-- This is the CRC16 algorithm used by Redis Cluster to hash keys.
+-- Implementation according to CCITT standards.
+--
+-- This is actually the XMODEM CRC 16 algorithm, using the
+-- following parameters:
+--
+-- Name                       : "XMODEM", also known as "ZMODEM", "CRC-16/ACORN"
+-- Width                      : 16 bit
+-- Poly                       : 1021 (That is actually x^16 + x^12 + x^5 + 1)
+-- Initialization             : 0000
+-- Reflect Input byte         : False
+-- Reflect Output CRC         : False
+-- Xor constant to output CRC : 0000
+-- Output for "123456789"     : 31C3
+--
+-- https://redis.io/topics/cluster-spec#appendix-a-crc16-reference-implementation-in-ansi-c
 
-typedef unsigned short int uint16_t;
-static const uint16_t crc16tab[256]= {
+local bit = require("bit")
+local band = bit.band
+local bxor = bit.bxor
+local lshift = bit.lshift
+local rshift = bit.rshift
+local byte = string.byte
+
+local XMODEMCRC16LOOKUP = {
     0x0000,0x1021,0x2042,0x3063,0x4084,0x50a5,0x60c6,0x70e7,
     0x8108,0x9129,0xa14a,0xb16b,0xc18c,0xd1ad,0xe1ce,0xf1ef,
     0x1231,0x0210,0x3273,0x2252,0x52b5,0x4294,0x72f7,0x62d6,
@@ -38,44 +56,24 @@ static const uint16_t crc16tab[256]= {
     0x7c26,0x6c07,0x5c64,0x4c45,0x3ca2,0x2c83,0x1ce0,0x0cc1,
     0xef1f,0xff3e,0xcf5d,0xdf7c,0xaf9b,0xbfba,0x8fd9,0x9ff8,
     0x6e17,0x7e36,0x4e55,0x5e74,0x2e93,0x3eb2,0x0ed1,0x1ef0
-};
-
-unsigned short
-lua_crc16(const char *buf, int len) {
-    int counter;
-    unsigned short crc = 0;
-    for (counter = 0; counter < len; counter++)
-            crc = (crc<<8) ^ crc16tab[((crc>>8) ^ *buf++)&0x00FF];
-    return crc;
 }
 
-int
-lua_redis_crc16(char *key, int keylen) {
-    unsigned short ret;
-    int s, e; /* start-end indexes of { and } */
+local _M = {}
 
-    for (s = 0; s < keylen; s++)
-    if (key[s] == '{') break;
 
-    /* No '{' ? Hash the whole key. This is the base case. */
-    if (s == keylen) {
-        ret = lua_crc16(key, keylen) & 0x3FFF;
-    } else {
+-- Depends on luajit bitop extension.
+local function crc16(str)
+    local crc = 0
+    str = tostring(str)
+    for i = 1, #str do
+        local b = byte(str, i)
+        crc = bxor(band(lshift(crc, 8), 0xffff), XMODEMCRC16LOOKUP[band(bxor(rshift(crc, 8), b), 0xff) + 1])
+    end
+    return crc
+end
 
-        /* '{' found? Check if we have the corresponding '}'. */
-        for (e = s+1; e < keylen; e++)
-        if (key[e] == '}') break;
+function _M.redis_crc(str)
+    return band(crc16(str), 0x3fff)
+end
 
-        /* No '}' or nothing betweeen {} ? Hash the whole key. */
-        if (e == keylen || e == s+1) {
-            ret = lua_crc16(key, keylen) & 0x3FFF;
-        } else {
-
-            /* If we are here there is both a { and a } on its right. Hash
-            * what is in the middle between { and }. */
-            ret = lua_crc16(key+s+1, e-s-1) & 0x3FFF;
-        }
-    }
-
-    return ret;
-}
+return _M
