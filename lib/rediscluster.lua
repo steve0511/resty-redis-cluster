@@ -5,6 +5,7 @@ local resty_lock = require "resty.lock"
 local setmetatable = setmetatable
 local tostring = tostring
 
+local DEFAULT_SHARED_DICT_NAME = "redis_cluster_slot_locks"
 local DEFAULT_MAX_REDIRECTION = 5
 local DEFAULT_KEEPALIVE_TIMEOUT = 55000
 local DEFAULT_KEEPALIVE_CONS = 1000
@@ -154,7 +155,7 @@ function _M.init_slots(self)
     if slot_cache[self.config.name] then
         return
     end
-    local lock, err = resty_lock:new("redis_cluster_slot_locks")
+    local lock, err = resty_lock:new(self.config.dict_name or DEFAULT_SHARED_DICT_NAME)
     if not lock then
         ngx.log(ngx.ERR, "failed to create lock in initialization slot cache: ", err)
         return
