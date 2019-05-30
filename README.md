@@ -89,6 +89,36 @@ else
     ngx.say(v)
 end
 ```
+  custom shared dictionary name:
+
+```lua
+local config = {
+    name = "testCluster",                   --rediscluster name
+    dict_name = "test_dict",                --lua shared dictionary name for locks
+    serv_list = {                           --redis cluster node list(host and port),
+        { ip = "127.0.0.1", port = 7001 },
+        { ip = "127.0.0.1", port = 7002 },
+        { ip = "127.0.0.1", port = 7003 },
+        { ip = "127.0.0.1", port = 7004 },
+        { ip = "127.0.0.1", port = 7005 },
+        { ip = "127.0.0.1", port = 7006 }
+    },
+    keepalive_timeout = 60000,              --redis connection pool idle timeout
+    keepalive_cons = 1000,                  --redis connection pool size
+    connection_timout = 1000,               --timeout while connecting
+    max_redirection = 5,                    --maximum retry attempts for redirection
+}
+
+local redis_cluster = require "rediscluster"
+local red_c = redis_cluster:new(config)
+
+local v, err = red_c:get("name")
+if err then
+    ngx.log(ngx.ERR, "err: ", err)
+else
+    ngx.say(v)
+end
+```
   authentication: 
   
 ```lua
