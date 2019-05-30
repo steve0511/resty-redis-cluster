@@ -15,10 +15,15 @@ description = {
     license = "Apache License 2.0"
 }
 
+dependencies = {
+  "lua >= 5.1",
+  "lua-resty-redis",
+}
+
 build = {
     type = "builtin",
     modules = {
         ["resty.rediscluster"] = "lib/resty/rediscluster.lua",
-        ["resty.xmodem"] = "lib/resty/xmodem.lua"
+        ["resty.xmodem"] = "lib/resty/xmodem.lua",
     }
 }
