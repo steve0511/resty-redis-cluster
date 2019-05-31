@@ -638,7 +638,7 @@ end
 function _M.commit_pipeline(self)
     local _reqs = rawget(self, "_reqs")
 
-    if not _reqs or #_reqs == 0 then return
+    if not _reqs or #_reqs == 0 then return nil, "no pipeline"
     end
 
     self._reqs = nil
