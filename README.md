@@ -1,6 +1,10 @@
 # resty-redis-cluster
 Openresty lua client for redis cluster.
 
+### Description
+
+This fork of [steve0511/resty-redis-cluster](https://github.com/steve0511/resty-redis-cluster) includes a few bugfixes and improvements.
+
 ### Why we build this client?
 Openresty has no official client which can support redis cluster. (We could see discussion at https://github.com/openresty/lua-resty-redis/issues/43). Also, looking around other 3rd party openresty redis cluster client , we do't find one can completely support redis cluster features as our project requirement.
 
