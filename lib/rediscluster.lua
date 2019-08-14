@@ -284,7 +284,16 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
     local config = self.config
 
     key = tostring(key)
-    local slot = redis_slot(key)
+
+    local slot_key = key
+    if cmd == 'evalsha' then
+        local t = {...}
+        if #t >= 2 then
+            slot_key = t[2]
+        end
+    end
+
+    local slot = redis_slot(slot_key)
 
     for k = 1, config.max_redirection or DEFAULT_MAX_REDIRECTION do
 
