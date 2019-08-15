@@ -342,7 +342,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
 
             local needToRetry = false
             local res, err
-            if cmd == "eval" then
+            if cmd == "eval" or cmd == "evalsha" then
                 res, err = redis_client[cmd](redis_client, ...)
             else
                 res, err = redis_client[cmd](redis_client, key, ...)
@@ -590,7 +590,7 @@ function _M.cancel_pipeline(self)
     self._reqs = nil
 end
 
-local function _do_eval_cmd(self, ...)
+local function _do_eval_cmd(self, cmd, ...)
 --[[
 eval command usage: 
 eval(script, 1, key, arg1, arg2 ...)
@@ -605,15 +605,15 @@ eval(script, 0, arg1, arg2 ...)
         return nil, "Cannot execute eval with more than one keys for redis cluster" 
     end
     local key = args[3] or "no_key"
-    return _do_cmd(self, "eval", key, ...)
+    return _do_cmd(self, cmd, key, ...)
 end
 -- dynamic cmd
 setmetatable(_M, {
     __index = function(self, cmd)
         local method =
         function(self, ...)
-            if cmd == "eval" then
-                return _do_eval_cmd(self, ...)
+            if cmd == "eval" or "evalsha" then
+                return _do_eval_cmd(self, cmd, ...)
             else
                 return _do_cmd(self, cmd, ...)
             end
