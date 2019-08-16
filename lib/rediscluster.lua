@@ -612,7 +612,7 @@ setmetatable(_M, {
     __index = function(self, cmd)
         local method =
         function(self, ...)
-            if cmd == "eval" or "evalsha" then
+            if cmd == "eval" or cmd == "evalsha" then
                 return _do_eval_cmd(self, cmd, ...)
             else
                 return _do_cmd(self, cmd, ...)
