@@ -552,7 +552,11 @@ function _M.commit_pipeline(self)
             for i = 1, #reqs do
                 local req = reqs[i]
                 if #req.args > 0 then
-                    redis_client[req.cmd](redis_client, req.key, unpack(req.args))
+                    if req.cmd == "eval" or req.cmd == "evalsha" then
+                        redis_client[req.cmd](redis_client, unpack(req.args))
+                    else
+                        redis_client[req.cmd](redis_client, req.key, unpack(req.args))
+                    end
                 else
                     redis_client[req.cmd](redis_client, req.key)
                 end
