@@ -1,8 +1,8 @@
-package = "lua-resty-redis-cluster-dev"
+package = "resty-redis-cluster-dev"
 version = "1.0-0"
+
 source = {
-    url = "git://github.com/iresty/lua-resty-redis-cluster",
-    branch = "master",
+    url = "https://github.com/steve0511/resty-redis-cluster/"
 }
 
 description = {
@@ -12,7 +12,6 @@ description = {
         This is a wrapper around the 'resty.redis' library with cluster discovery
         and failover recovery support.
     ]],
-    homepage = "https://github.com/iresty/lua-resty-redis-cluster",
     license = "Apache License 2.0"
 }
 
