@@ -1,9 +1,19 @@
 local ffi = require 'ffi'
 local redis = require "resty.redis"
 local resty_lock = require "resty.lock"
-
 local setmetatable = setmetatable
 local tostring = tostring
+local string = string
+local io = io
+local package = package
+local type = type
+local table = table
+local ngx = ngx
+local math = math
+local rawget = rawget
+local pairs = pairs
+local unpack = unpack
+
 
 local DEFAULT_MAX_REDIRECTION = 5
 local DEFAULT_KEEPALIVE_TIMEOUT = 55000
@@ -71,13 +81,16 @@ local function checkAuth(self, redis_client)
     if type(self.config.auth) == "string" then
         local count, err = redis_client:get_reused_times()
         if count == 0 then
+            local _
             _, err = redis_client:auth(self.config.auth)
         end
+
         if not err then
             return true, nil
         else
             return nil, err
         end
+
     else
         return true, nil
     end
@@ -596,7 +609,7 @@ end
 
 local function _do_eval_cmd(self, cmd, ...)
 --[[
-eval command usage: 
+eval command usage:
 eval(script, 1, key, arg1, arg2 ...)
 eval(script, 0, arg1, arg2 ...)
 ]]
@@ -606,7 +619,7 @@ eval(script, 0, arg1, arg2 ...)
         return nil, "Cannot execute eval without keys number"
     end
     if keys_num > 1 then
-        return nil, "Cannot execute eval with more than one keys for redis cluster" 
+        return nil, "Cannot execute eval with more than one keys for redis cluster"
     end
     local key = args[3] or "no_key"
     return _do_cmd(self, cmd, key, ...)
