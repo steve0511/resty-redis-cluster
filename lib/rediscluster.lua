@@ -20,8 +20,9 @@ local DEFAULT_KEEPALIVE_TIMEOUT = 55000
 local DEFAULT_KEEPALIVE_CONS = 1000
 local DEFAULT_CONNECTION_TIMEOUT = 1000
 
+
 ffi.cdef [[
-int lua_redis_crc16(char *key, int keylen);
+    int lua_redis_crc16(char *key, int keylen);
 ]]
 
 --load from path, otherwise we should load from LD_LIBRARY_PATH by
@@ -47,9 +48,9 @@ local function load_shared_lib(so_name)
 end
 
 
-local clib = load_shared_lib("redis_slot.so")
+local clib = load_shared_lib("librestyredisslot.so")
 if not clib then
-    ngx.log(ngx.ERR, "can not load redis_slot library")
+    ngx.log(ngx.ERR, "can not load librestyredisslot library")
 end
 
 
@@ -66,7 +67,7 @@ end
 
 
 local function redis_slot(str)
-    local str = parseKey(str)
+    str = parseKey(str)
     return clib.lua_redis_crc16(ffi.cast("char *", str), #str)
 end
 

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "redis_slot.h"
+
 typedef unsigned short int uint16_t;
 static const uint16_t crc16tab[256]= {
     0x0000,0x1021,0x2042,0x3063,0x4084,0x50a5,0x60c6,0x70e7,
@@ -38,7 +40,8 @@ static const uint16_t crc16tab[256]= {
     0x6e17,0x7e36,0x4e55,0x5e74,0x2e93,0x3eb2,0x0ed1,0x1ef0
 };
 
-unsigned short lua_crc16(const char *buf, int len) {
+unsigned short
+lua_crc16(const char *buf, int len) {
     int counter;
     unsigned short crc = 0;
     for (counter = 0; counter < len; counter++)
@@ -46,7 +49,8 @@ unsigned short lua_crc16(const char *buf, int len) {
     return crc;
 }
 
-int lua_redis_crc16(char *key, int keylen) {
+int
+lua_redis_crc16(char *key, int keylen) {
     unsigned short ret;
     int s, e; /* start-end indexes of { and } */
 

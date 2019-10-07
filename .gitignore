@@ -32,3 +32,4 @@ Thumbs.db
 
 #c
 *.so
+*.o
