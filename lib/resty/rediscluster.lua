@@ -273,9 +273,6 @@ function _M.new(self, config)
 end
 
 
-math.randomseed(os.time())
-
-
 local function pick_node(self, serv_list, slot, magicRadomSeed)
     local host
     local port
