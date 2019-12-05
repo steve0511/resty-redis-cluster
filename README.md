@@ -51,6 +51,7 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 3. nginx.conf add config:
 
    lua_shared_dict redis_cluster_slot_locks 100k;
+   lua_shared_dict redis_cluster_serv_list_locks 100k;
 
 ### Sample usage
 
