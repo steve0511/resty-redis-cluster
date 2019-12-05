@@ -127,10 +127,20 @@ local function try_hosts_slots(self, serv_list)
             local slots_info, err = redis_client:cluster("slots")
             if slots_info then
                 local slots = {}
+                
+                -- while slots are updated, create a list of servers present in cluster
+                -- this can differ from self.config.serv_list if a cluster is resized (added/removed nodes)
+                local servers = { serv_list = {} }
                 for i = 1, #slots_info do
                     local sub_info = slots_info[i]
                     --slot info item 1 and 2 are the subrange start end slots
                     local startslot, endslot = sub_info[1], sub_info[2]
+
+                    -- generate new list of servers
+                    for j = 3, #sub_info do
+                      servers.serv_list[#servers.serv_list + 1 ] = { ip = sub_info[j][1], port = sub_info[j][2] }
+                    end
+
                     for slot = startslot, endslot do
                         local list = { serv_list = {} }
                         --from 3, here lists the host/port/nodeid of in charge nodes
@@ -142,6 +152,7 @@ local function try_hosts_slots(self, serv_list)
                 end
                 --ngx.log(ngx.NOTICE, "finished initializing slotcache...")
                 slot_cache[self.config.name] = slots
+                slot_cache[self.config.name .. "serv_list"] = servers
                 releaseConnection(redis_client, config)
                 return true, nil
             else
@@ -157,7 +168,20 @@ end
 
 function _M.fetch_slots(self)
     local serv_list = self.config.serv_list
-    local ok, errors = try_hosts_slots(self, serv_list)
+    local serv_list_cached = slot_cache[self.config.name .. "serv_list"]
+
+    local serv_list_combined = {}
+
+    -- if a cached serv_list is present, use it
+    if serv_list_cached then
+        serv_list_combined = serv_list_cached.serv_list
+    else
+        serv_list_combined = serv_list
+    end
+
+    serv_list_cached = nil -- important!
+
+    local ok, errors = try_hosts_slots(self, serv_list_combined)
     if errors then
         ngx.log(ngx.ERR, "failed to fetch slots: ", table.concat(errors, ";"))
     end
@@ -195,6 +219,37 @@ function _M.init_slots(self)
     end
 end
 
+function _M.init_serv_list(self)
+    if slot_cache[self.config.name .. "serv_list"] then
+        return
+    end
+    local lock, err = resty_lock:new("redis_cluster_serv_list_locks")
+    if not lock then
+        ngx.log(ngx.ERR, "failed to create lock in initialization serv_list cache: ", err)
+        return
+    end
+
+    local elapsed, err = lock:lock("redis_cluster_serv_list_locks" .. self.config.name)
+    if not elapsed then
+        ngx.log(ngx.ERR, "failed to acquire the lock in initialization serv_list cache: ", err)
+        return
+    end
+
+    if slot_cache[self.config.name .. "serv_list"] then
+        local ok, err = lock:unlock()
+        if not ok then
+            ngx.log(ngx.ERR, "failed to unlock in initialization serv_list cache: ", err)
+        end
+        return
+    end
+
+    local ok, err = lock:unlock()
+    if not ok then
+        ngx.log(ngx.ERR, "failed to unlock in initialization serv_list cache:", err)
+    end
+end
+
+
 function _M.new(self, config)
     if not config.name then
         return nil, " redis cluster config name is empty"
@@ -202,6 +257,11 @@ function _M.new(self, config)
     if not config.serv_list or #config.serv_list < 1 then
         return nil, " redis cluster config serv_list is empty"
     end
+    
+    local serv_list_inst = { config = config }
+    serv_list_inst = setmetatable(serv_list_inst, mt)
+    serv_list_inst:init_serv_list()
+
     local inst = { config = config }
     inst = setmetatable(inst, mt)
     inst:init_slots()
@@ -307,6 +367,9 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         end
 
         local slots = slot_cache[self.config.name]
+        if not slots then
+            return nil, "not slots information present, server might have never successfully executed cluster(\"slots\")"
+        end
         local serv_list = slots[slot].serv_list
 
         -- We must empty local reference to slots cache, otherwise there will be memory issue while
@@ -402,7 +465,8 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         else
             --There might be node fail, we should also refresh slot cache
             self:fetch_slots()
-            return nil, connerr
+            -- Do not return here, allow rediscluster to retry with updated slots information
+            --return nil, connerr
         end
     end
     return nil, "failed to execute command, reaches maximum redirection attempts"
@@ -413,7 +477,8 @@ local function generateMagicSeed(self)
     --For pipeline, We don't want request to be forwarded to all channels, eg. if we have 3*3 cluster(3 master 2 replicas) we
     --alway want pick up specific 3 nodes for pipeline requests, instead of 9.
     --Currently we simply use (num of allnode)%count as a randomly fetch. Might consider a better way in the future.
-    local nodeCount = #self.config.serv_list
+    -- use the dynamic serv_list instead of the static config serv_list
+    local nodeCount = #slot_cache[self.config.name .. "serv_list"].serv_list
     return math.random(nodeCount)
 end
 
