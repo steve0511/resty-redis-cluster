@@ -116,8 +116,8 @@ local function try_hosts_slots(self, serv_list)
         local ip = serv_list[i].ip
         local port = serv_list[i].port
         local redis_client = redis:new()
-        local ok, err = redis_client:connect(ip, port)
         redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        local ok, err = redis_client:connect(ip, port)
         if ok then
             local authok, autherr = checkAuth(self, redis_client)
             if autherr then
