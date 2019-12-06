@@ -19,6 +19,8 @@ local DEFAULT_MAX_REDIRECTION = 5
 local DEFAULT_KEEPALIVE_TIMEOUT = 55000
 local DEFAULT_KEEPALIVE_CONS = 1000
 local DEFAULT_CONNECTION_TIMEOUT = 1000
+local DEFAULT_SEND_TIMEOUT = 1000
+local DEFAULT_READ_TIMEOUT = 1000
 
 
 ffi.cdef [[
@@ -117,7 +119,7 @@ local function try_hosts_slots(self, serv_list)
         local port = serv_list[i].port
         local redis_client = redis:new()
         local ok, err = redis_client:connect(ip, port)
-        redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        redis_client:set_timeouts(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT, config.send_timout or DEFAULT_SEND_TIMEOUT, config.read_timout or DEFAULT_READ_TIMEOUT)
         if ok then
             local authok, autherr = checkAuth(self, redis_client)
             if autherr then
@@ -328,7 +330,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         end
 
         local redis_client = redis:new()
-        redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        redis_client:set_timeouts(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT, config.send_timout or DEFAULT_SEND_TIMEOUT, config.read_timout or DEFAULT_READ_TIMEOUT)
         local ok, connerr = redis_client:connect(ip, port)
 
         if ok then
@@ -545,7 +547,7 @@ function _M.commit_pipeline(self)
         local reqs = v.reqs
         local slave = v.slave
         local redis_client = redis:new()
-        redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        redis_client:set_timeouts(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT, config.send_timout or DEFAULT_SEND_TIMEOUT, config.read_timout or DEFAULT_READ_TIMEOUT)
         local ok, err = redis_client:connect(ip, port)
 
         local authok, autherr = checkAuth(self, redis_client)

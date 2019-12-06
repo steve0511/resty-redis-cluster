@@ -70,6 +70,8 @@ local config = {
     keepalive_timeout = 60000,              --redis connection pool idle timeout
     keepalive_cons = 1000,                  --redis connection pool size
     connection_timout = 1000,               --timeout while connecting
+    send_timout = 1000,                     --timeout while sending
+    read_timout = 1000,                     --timeout while reading
     max_redirection = 5,                    --maximum retry attempts for redirection
 }
 
