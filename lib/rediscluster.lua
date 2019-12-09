@@ -127,7 +127,6 @@ local function try_hosts_slots(self, serv_list)
             local slots_info, err = redis_client:cluster("slots")
             if slots_info then
                 local slots = {}
-                
                 -- while slots are updated, create a list of servers present in cluster
                 -- this can differ from self.config.serv_list if a cluster is resized (added/removed nodes)
                 local servers = { serv_list = {} }
@@ -363,12 +362,12 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
     for k = 1, config.max_redirection or DEFAULT_MAX_REDIRECTION do
 
         if k > 1 then
-            --ngx.log(ngx.NOTICE, "handle retry attempts:" .. k .. " for cmd:" .. cmd .. " key:" .. key)
+            ngx.log(ngx.NOTICE, "handle retry attempts:" .. k .. " for cmd:" .. cmd .. " key:" .. key)
         end
 
         local slots = slot_cache[self.config.name]
-        if not slots then
-            return nil, "not slots information present, server might have never successfully executed cluster(\"slots\")"
+        if slots == nil or slots[slot] == nil then
+            return nil, "not slots information present, nginx might have never successfully executed cluster(\"slots\")"
         end
         local serv_list = slots[slot].serv_list
 
@@ -465,8 +464,11 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         else
             --There might be node fail, we should also refresh slot cache
             self:fetch_slots()
-            -- Do not return here, allow rediscluster to retry with updated slots information
-            --return nil, connerr
+            ngx.log(ngx.NOTICE, "got " .. connerr .. ". Will not return error but will allow retry")
+            if k == config.max_redirection or k == DEFAULT_MAX_REDIRECTION then
+                -- only return after allowing for `k` attempts
+                return nil, connerr
+            end
         end
     end
     return nil, "failed to execute command, reaches maximum redirection attempts"
