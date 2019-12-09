@@ -568,6 +568,9 @@ function _M.commit_pipeline(self)
     local needToRetry = false
 
     local slots = slot_cache[config.name]
+    if slots == nil then
+        return nil, "not slots information present, nginx might have never successfully executed cluster(\"slots\")"
+    end
 
     local node_res_map = {}
 
@@ -581,6 +584,9 @@ function _M.commit_pipeline(self)
         _reqs[i].origin_index = i
         local key = _reqs[i].key
         local slot = redis_slot(tostring(key))
+        if slots[slot] == nil then
+            return nil, "not slots information present, nginx might have never successfully executed cluster(\"slots\")"
+        end
         local slot_item = slots[slot]
 
         local ip, port, slave, err = pick_node(self, slot_item.serv_list, slot, magicRandomPickupSeed)
