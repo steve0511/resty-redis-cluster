@@ -218,35 +218,6 @@ function _M.init_slots(self)
     end
 end
 
-function _M.init_serv_list(self)
-    if slot_cache[self.config.name .. "serv_list"] then
-        return
-    end
-    local lock, err = resty_lock:new("redis_cluster_serv_list_locks")
-    if not lock then
-        ngx.log(ngx.ERR, "failed to create lock in initialization serv_list cache: ", err)
-        return
-    end
-
-    local elapsed, err = lock:lock("redis_cluster_serv_list_locks" .. self.config.name)
-    if not elapsed then
-        ngx.log(ngx.ERR, "failed to acquire the lock in initialization serv_list cache: ", err)
-        return
-    end
-
-    if slot_cache[self.config.name .. "serv_list"] then
-        local ok, err = lock:unlock()
-        if not ok then
-            ngx.log(ngx.ERR, "failed to unlock in initialization serv_list cache: ", err)
-        end
-        return
-    end
-
-    local ok, err = lock:unlock()
-    if not ok then
-        ngx.log(ngx.ERR, "failed to unlock in initialization serv_list cache:", err)
-    end
-end
 
 
 function _M.new(self, config)
@@ -257,9 +228,6 @@ function _M.new(self, config)
         return nil, " redis cluster config serv_list is empty"
     end
     
-    local serv_list_inst = { config = config }
-    serv_list_inst = setmetatable(serv_list_inst, mt)
-    serv_list_inst:init_serv_list()
 
     local inst = { config = config }
     inst = setmetatable(inst, mt)

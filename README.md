@@ -39,7 +39,7 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 11. Also verified working properly in AWS elasticache.
 
 12. Allows rolling replacement of redis cluster.
-    Example) Redis Cluster with IPs 10.0.0.2, .3 and .4 is present. New nodes are introduced at IPs 10.0.0.5, .6 and .7. Slots are relocated fom node .2, .3 and .4 to .5, .6, and .7. The initial nodes can now be removed without downtime.
+    Example) Redis Cluster with IPs 10.0.0.2, .3 and .4 is present. New nodes are introduced at IPs 10.0.0.5, .6 and .7. Slots are relocated fom node .2, .3 and .4 to .5, .6, and .7. The initial nodes can now be removed without downtime in nginx, since the initial configuration is not used anymore.
 
 ### installation
 
@@ -54,7 +54,6 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 3. nginx.conf add config:
 
    lua_shared_dict redis_cluster_slot_locks 100k;
-   lua_shared_dict redis_cluster_serv_list_locks 100k;
 
 ### Sample usage
 
