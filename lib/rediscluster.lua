@@ -464,7 +464,6 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         else
             --There might be node fail, we should also refresh slot cache
             self:fetch_slots()
-            ngx.log(ngx.NOTICE, "got " .. connerr .. ". Will not return error but will allow retry")
             if k == config.max_redirection or k == DEFAULT_MAX_REDIRECTION then
                 -- only return after allowing for `k` attempts
                 return nil, connerr
