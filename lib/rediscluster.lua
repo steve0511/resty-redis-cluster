@@ -16,6 +16,7 @@ local unpack = unpack
 
 
 local DEFAULT_MAX_REDIRECTION = 5
+local DEFAULT_MAX_CONNECTION_ATTEMPTS = 3
 local DEFAULT_KEEPALIVE_TIMEOUT = 55000
 local DEFAULT_KEEPALIVE_CONS = 1000
 local DEFAULT_CONNECTION_TIMEOUT = 1000
@@ -116,8 +117,19 @@ local function try_hosts_slots(self, serv_list)
         local ip = serv_list[i].ip
         local port = serv_list[i].port
         local redis_client = redis:new()
+        local ok, err
         redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
-        local ok, err = redis_client:connect(ip, port)
+
+        --attempt to connect DEFAULT_MAX_CONNECTION_ATTEMPTS times to redis
+        for k = 1, config.max_connection_attempts or DEFAULT_MAX_CONNECTION_ATTEMPTS do
+            ok, err = redis_client:connect(ip, port)
+            if ok then break end
+            if err then
+                ngx.log(ngx.ERR,"unable to connect, attempt nr ", k, " : error: ", err)
+                table.insert(errors, err)
+            end
+        end
+
         if ok then
             local authok, autherr = checkAuth(self, redis_client)
             if autherr then

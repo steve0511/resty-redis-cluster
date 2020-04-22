@@ -75,6 +75,7 @@ local config = {
     keepalive_cons = 1000,                  --redis connection pool size
     connection_timout = 1000,               --timeout while connecting
     max_redirection = 5,                    --maximum retry attempts for redirection
+    max_connection_attempts = 1             --maximum retry attempts for connection
 }
 
 local redis_cluster = require "rediscluster"
@@ -104,6 +105,7 @@ local config = {
     keepalive_cons = 1000,                  --redis connection pool size
     connection_timout = 1000,               --timeout while connecting
     max_redirection = 5,                    --maximum retry attempts for redirection,
+    max_connection_attempts = 1,            --maximum retry attempts for connection
     auth = "pass"                           --set password while setting auth
 }
 
@@ -136,7 +138,8 @@ local config = {
     keepalive_timeout = 60000,
     keepalive_cons = 1000,
     connection_timout = 1000,
-    max_redirection = 5
+    max_redirection = 5,
+    max_connection_attempts = 1
 }
 
 local redis_cluster = require "rediscluster"
@@ -183,6 +186,7 @@ local config = {
     keepalive_cons = 1000,
     connection_timout = 1000,
     max_redirection = 5
+    max_connection_attempts = 1
 }
 
 local redis_cluster = require "rediscluster"
@@ -214,7 +218,8 @@ local config = {
     keepalive_timeout = 60000,
     keepalive_cons = 1000,
     connection_timout = 1000,
-    max_redirection = 5
+    max_redirection = 5,
+    max_connection_attempts = 1
 }
 
 local redis_cluster = require "rediscluster"
@@ -252,6 +257,7 @@ local config = {
     keepalive_cons = 1000,                  --redis connection pool size
     connection_timout = 1000,               --timeout while connecting
     max_redirection = 5,                    --maximum retry attempts for redirection
+    max_connection_attempts = 1             --maximum retry attempts for connection
 }
 
 local redis_cluster = require "rediscluster"
