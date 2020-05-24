@@ -46,12 +46,15 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 1. please compile and generate librestyredisslot.so from redis_slot.c (can done by gcc)
 
 2. please add xmodem.lua and rediscluster.lua at lualib, Also please add library:lua-resty-redis and lua-resty-lock
-
+   
    nginx.conf like:
 
    lua_package_path "/path/lualib/?.lua;";
    lua_package_cpath "/path/lualib/?.so;";
 
+3. nginx.conf add config:
+
+   lua_shared_dict redis_cluster_slot_locks 100k;
 
 ### Sample usage
 
@@ -159,8 +162,8 @@ end
 
 3. enable slave node read:
 
-   Note: Currently enable_slave_read is only limited in pure read scenario.
-   We don't support mixed read and write scenario(distingush read, write operation) in single config set with enable_slave_read now.
+   Note: Currently enableSlaveRead is only limited in pure read scenario.
+   We don't support mixed read and write scenario(distingush read, write operation) in single config set with enableSlaveRead now.
    If your scenario is mixed with write operation, please disable the option.
 
    Also, you can isolate pure read scenaro into another config set.
@@ -170,7 +173,7 @@ local cjson = require "cjson"
 
 local config = {
     name = "testCluster",
-    enable_slave_read = true,
+    enableSlaveRead = true,
     serv_list = {
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
@@ -203,7 +206,7 @@ local cjson = require "cjson"
 
 local config = {
     name = "testCluster",
-    enable_slave_read = true,
+    enableSlaveRead = true,
     serv_list = {
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
@@ -297,4 +300,3 @@ Redistributions of source code must retain the above copyright notice, this list
 Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
