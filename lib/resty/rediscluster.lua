@@ -56,6 +56,7 @@ local cluster_invalid_cmds = {
 local function redis_slot(str)
     return xmodem.redis_crc(parseKey(str))
 end
+
 local function checkAuth(self, redis_client)
     if type(self.config.auth) == "string" then
         local count, err = redis_client:get_reused_times()
@@ -425,8 +426,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
             else
                 res, err = redis_client[cmd](redis_client, key, ...)
             end
-            local cjson = require "cjson"
-            print('vinayak ' .. cjson.encode(res))
+
             if err then
                 if string.sub(err, 1, 5) == "MOVED" then
                     --ngx.log(ngx.NOTICE, "find MOVED signal, trigger retry for normal commands, cmd:" .. cmd .. " key:" .. key)
