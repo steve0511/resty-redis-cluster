@@ -81,7 +81,9 @@ local function try_hosts_slots(self, serv_list)
         local port = serv_list[i].port
         local redis_client = redis:new()
         local ok, err
-        redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        redis_client:set_timeout(config.connection_timeout or
+                                 config.connection_timout  or
+                                 DEFAULT_CONNECTION_TIMEOUT)
 
         --attempt to connect DEFAULT_MAX_CONNECTION_ATTEMPTS times to redis
         for k = 1, config.max_connection_attempts or DEFAULT_MAX_CONNECTION_ATTEMPTS do
@@ -349,7 +351,9 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         end
 
         local redis_client = redis:new()
-        redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        redis_client:set_timeout(config.connection_timeout or
+                                 config.connection_timout  or
+                                 DEFAULT_CONNECTION_TIMEOUT)
         local ok, connerr = redis_client:connect(ip, port)
 
         if ok then
@@ -576,7 +580,9 @@ function _M.commit_pipeline(self)
         local reqs = v.reqs
         local slave = v.slave
         local redis_client = redis:new()
-        redis_client:set_timeout(config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        redis_client:set_timeout(config.connection_timeout or
+                                 config.connection_timout  or
+                                 DEFAULT_CONNECTION_TIMEOUT)
         local ok, err = redis_client:connect(ip, port)
 
         local authok, autherr = checkAuth(self, redis_client)
