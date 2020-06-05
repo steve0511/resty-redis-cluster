@@ -11,6 +11,10 @@ local math = math
 local rawget = rawget
 local pairs = pairs
 local unpack = unpack
+local ipairs = ipairs
+local tonumber = tonumber
+local match = string.match
+local char = string.char
 
 
 local DEFAULT_MAX_REDIRECTION = 5
@@ -37,7 +41,17 @@ local _M = {}
 local mt = { __index = _M }
 
 local slot_cache = {}
+local master_nodes = {}
 
+local cmds_for_all_master = {
+    ["flushall"] = true,
+    ["flushdb"] = true
+}
+
+local cluster_invalid_cmds = {
+    ["config"] = true,
+    ["shutdown"] = true
+}
 
 local function redis_slot(str)
     return xmodem.redis_crc(parseKey(str))
@@ -68,6 +82,14 @@ local function releaseConnection(red, config)
     if not ok then
         ngx.log(ngx.ERR,"set keepalive failed:", err)
     end
+end
+
+local function split(s, delimiter)
+    local result = {};
+    for m in (s..delimiter):gmatch("(.-)"..delimiter) do
+        table.insert(result, m);
+    end
+    return result;
 end
 
 local function try_hosts_slots(self, serv_list)
@@ -129,13 +151,35 @@ local function try_hosts_slots(self, serv_list)
                 --ngx.log(ngx.NOTICE, "finished initializing slotcache...")
                 slot_cache[self.config.name] = slots
                 slot_cache[self.config.name .. "serv_list"] = servers
-                releaseConnection(redis_client, config)
-                return true, nil
             else
                 table.insert(errors, err)
             end
+            -- cache master nodes
+            local nodes_res, nerr = redis_client:cluster("nodes")
+            if nodes_res then
+                local nodes_info = split(nodes_res, char(10))
+                for _, node in ipairs(nodes_info) do
+                    local node_info = split(node, " ")
+                    if #node_info > 2 then
+                        local is_master = match(node_info[3], "master") ~= nil
+                        if is_master then
+                            local ip_port = split(split(node_info[2], "@")[1], ":")
+                            table.insert(master_nodes, {
+                                ip = ip_port[1],
+                                port = tonumber(ip_port[2])
+                            })
+                        end
+                    end
+                end
+            else
+                table.insert(errors, nerr)
+            end
+            releaseConnection(redis_client, config)
         else
             table.insert(errors, err)
+        end
+        if #errors == 0 then
+            return true, nil
         end
     end
     return nil, errors
@@ -396,6 +440,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
                     targetPort = nil
                     self:fetch_slots()
                     needToRetry = true
+
                 elseif string.sub(err, 1, 3) == "ASK" then
                     --ngx.log(ngx.NOTICE, "handle asking for normal commands, cmd:" .. cmd .. " key:" .. key)
                     releaseConnection(redis_client, config)
@@ -446,14 +491,38 @@ local function generateMagicSeed(self)
     return math.random(nodeCount)
 end
 
+local function _do_cmd_master(self, cmd, key, ...)
+    local errors = {}
+    for _, master in ipairs(master_nodes) do
+        local redis_client = redis:new()
+        redis_client:set_timeout(self.config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        local ok, err = redis_client:connect(master.ip, master.port)
+        if ok then
+            ok, err = redis_client[cmd](redis_client, key, ...)
+        end
+        if err then
+            table.insert(errors, err)
+        end
+        releaseConnection(redis_client, self.config)
+    end
+    return #errors == 0, table.concat(errors, ";")
+end
 
 local function _do_cmd(self, cmd, key, ...)
+    if cluster_invalid_cmds[cmd] == true then
+        return nil, "command not supported"
+    end
+
     local _reqs = rawget(self, "_reqs")
     if _reqs then
         local args = { ... }
         local t = { cmd = cmd, key = key, args = args }
         table.insert(_reqs, t)
         return
+    end
+
+    if cmds_for_all_master[cmd] then
+        return _do_cmd_master(self, cmd, key, ...)
     end
 
     local res, err = handleCommandWithRetry(self, nil, nil, false, cmd, key, ...)
