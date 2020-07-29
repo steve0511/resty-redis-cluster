@@ -23,7 +23,8 @@ local DEFAULT_MAX_CONNECTION_ATTEMPTS = 3
 local DEFAULT_KEEPALIVE_TIMEOUT = 55000
 local DEFAULT_KEEPALIVE_CONS = 1000
 local DEFAULT_CONNECTION_TIMEOUT = 1000
-
+local DEFAULT_SEND_TIMEOUT = 1000
+local DEFAULT_READ_TIMEOUT = 1000
 
 local function parseKey(keyStr)
     local leftTagSingalIndex = string.find(keyStr, "{", 0)
@@ -104,9 +105,9 @@ local function try_hosts_slots(self, serv_list)
         local port = serv_list[i].port
         local redis_client = redis:new()
         local ok, err
-        redis_client:set_timeout(config.connection_timeout or
-                                 config.connection_timout  or
-                                 DEFAULT_CONNECTION_TIMEOUT)
+        redis_client:set_timeouts(config.connect_timeout or DEFAULT_CONNECTION_TIMEOUT,
+                                  config.send_timeout or DEFAULT_SEND_TIMEOUT,
+                                  config.read_timeout or DEFAULT_READ_TIMEOUT)
 
         --attempt to connect DEFAULT_MAX_CONNECTION_ATTEMPTS times to redis
         for k = 1, config.max_connection_attempts or DEFAULT_MAX_CONNECTION_ATTEMPTS do
@@ -393,9 +394,9 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         end
 
         local redis_client = redis:new()
-        redis_client:set_timeout(config.connection_timeout or
-                                 config.connection_timout  or
-                                 DEFAULT_CONNECTION_TIMEOUT)
+        redis_client:set_timeouts(config.connect_timeout or DEFAULT_CONNECTION_TIMEOUT,
+                                  config.send_timeout or DEFAULT_SEND_TIMEOUT,
+                                  config.read_timeout or DEFAULT_READ_TIMEOUT)
         local ok, connerr = redis_client:connect(ip, port)
 
         if ok then
@@ -493,7 +494,9 @@ local function _do_cmd_master(self, cmd, key, ...)
     local errors = {}
     for _, master in ipairs(master_nodes) do
         local redis_client = redis:new()
-        redis_client:set_timeout(self.config.connection_timout or DEFAULT_CONNECTION_TIMEOUT)
+        redis_client:set_timeouts(self.config.connect_timeout or DEFAULT_CONNECTION_TIMEOUT,
+                                  self.config.send_timeout or DEFAULT_SEND_TIMEOUT,
+                                  self.config.read_timeout or DEFAULT_READ_TIMEOUT)
         local ok, err = redis_client:connect(master.ip, master.port)
         if ok then
             ok, err = redis_client[cmd](redis_client, key, ...)
@@ -647,9 +650,9 @@ function _M.commit_pipeline(self)
         local reqs = v.reqs
         local slave = v.slave
         local redis_client = redis:new()
-        redis_client:set_timeout(config.connection_timeout or
-                                 config.connection_timout  or
-                                 DEFAULT_CONNECTION_TIMEOUT)
+        redis_client:set_timeouts(config.connect_timeout or DEFAULT_CONNECTION_TIMEOUT,
+                                  config.send_timeout or DEFAULT_SEND_TIMEOUT,
+                                  config.read_timeout or DEFAULT_READ_TIMEOUT)
         local ok, err = redis_client:connect(ip, port)
 
         local authok, autherr = checkAuth(self, redis_client)
