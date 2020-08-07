@@ -105,6 +105,8 @@ local config = {
     keepalive_timeout = 60000,              --redis connection pool idle timeout
     keepalive_cons = 1000,                  --redis connection pool size
     connection_timeout = 1000,              --timeout while connecting
+    read_timeout = 1000,                    --timeout while reading
+    send_timeout = 1000,                    --timeout while sending
     max_redirection = 5,                    --maximum retry attempts for redirection,
     max_connection_attempts = 1,            --maximum retry attempts for connection
     auth = "pass"                           --set password while setting auth
@@ -139,6 +141,8 @@ local config = {
     keepalive_timeout = 60000,
     keepalive_cons = 1000,
     connection_timeout = 1000,
+    read_timeout = 1000,
+    send_timeout = 1000,
     max_redirection = 5,
     max_connection_attempts = 1
 }
@@ -186,6 +190,8 @@ local config = {
     keepalive_timeout = 60000,
     keepalive_cons = 1000,
     connection_timeout = 1000,
+    read_timeout = 1000,
+    send_timeout = 1000,
     max_redirection = 5,
     max_connection_attempts = 1
 }
@@ -219,6 +225,8 @@ local config = {
     keepalive_timeout = 60000,
     keepalive_cons = 1000,
     connection_timeout = 1000,
+    read_timeout = 1000,
+    send_timeout = 1000,
     max_redirection = 5,
     max_connection_attempts = 1
 }
@@ -257,6 +265,8 @@ local config = {
     keepalive_timeout = 60000,              --redis connection pool idle timeout
     keepalive_cons = 1000,                  --redis connection pool size
     connection_timeout = 1000,              --timeout while connecting
+    read_timeout = 1000,                    --timeout while reading
+    send_timeout = 1000,                    --timeout while sending
     max_redirection = 5,                    --maximum retry attempts for redirection
     max_connection_attempts = 1             --maximum retry attempts for connection
 }
