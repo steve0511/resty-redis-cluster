@@ -111,7 +111,7 @@ local function try_hosts_slots(self, serv_list)
 
         --attempt to connect DEFAULT_MAX_CONNECTION_ATTEMPTS times to redis
         for k = 1, config.max_connection_attempts or DEFAULT_MAX_CONNECTION_ATTEMPTS do
-            ok, err = redis_client:connect(ip, port)
+            ok, err = redis_client:connect(ip, port, self.config.connect_opts)
             if ok then break end
             if err then
                 ngx.log(ngx.ERR,"unable to connect, attempt nr ", k, " : error: ", err)
@@ -397,7 +397,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         redis_client:set_timeouts(config.connect_timeout or DEFAULT_CONNECTION_TIMEOUT,
                                   config.send_timeout or DEFAULT_SEND_TIMEOUT,
                                   config.read_timeout or DEFAULT_READ_TIMEOUT)
-        local ok, connerr = redis_client:connect(ip, port)
+        local ok, connerr = redis_client:connect(ip, port, self.config.connect_opts)
 
         if ok then
             local authok, autherr = checkAuth(self, redis_client)
@@ -497,7 +497,7 @@ local function _do_cmd_master(self, cmd, key, ...)
         redis_client:set_timeouts(self.config.connect_timeout or DEFAULT_CONNECTION_TIMEOUT,
                                   self.config.send_timeout or DEFAULT_SEND_TIMEOUT,
                                   self.config.read_timeout or DEFAULT_READ_TIMEOUT)
-        local ok, err = redis_client:connect(master.ip, master.port)
+        local ok, err = redis_client:connect(master.ip, master.port, self.config.connect_opts)
         if ok then
             ok, err = redis_client[cmd](redis_client, key, ...)
         end
@@ -653,7 +653,7 @@ function _M.commit_pipeline(self)
         redis_client:set_timeouts(config.connect_timeout or DEFAULT_CONNECTION_TIMEOUT,
                                   config.send_timeout or DEFAULT_SEND_TIMEOUT,
                                   config.read_timeout or DEFAULT_READ_TIMEOUT)
-        local ok, err = redis_client:connect(ip, port)
+        local ok, err = redis_client:connect(ip, port, self.config.connect_opts)
 
         local authok, autherr = checkAuth(self, redis_client)
         if autherr then
