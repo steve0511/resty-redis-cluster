@@ -74,7 +74,7 @@ local config = {
     },
     keepalive_timeout = 60000,              --redis connection pool idle timeout
     keepalive_cons = 1000,                  --redis connection pool size
-    connection_timeout = 1000,              --timeout while connecting
+    connect_timeout = 1000,              --timeout while connecting
     max_redirection = 5,                    --maximum retry attempts for redirection
     max_connection_attempts = 1             --maximum retry attempts for connection
 }
@@ -104,7 +104,7 @@ local config = {
     },
     keepalive_timeout = 60000,              --redis connection pool idle timeout
     keepalive_cons = 1000,                  --redis connection pool size
-    connection_timeout = 1000,              --timeout while connecting
+    connect_timeout = 1000,              --timeout while connecting
     read_timeout = 1000,                    --timeout while reading
     send_timeout = 1000,                    --timeout while sending
     max_redirection = 5,                    --maximum retry attempts for redirection,
@@ -140,7 +140,7 @@ local config = {
     },
     keepalive_timeout = 60000,
     keepalive_cons = 1000,
-    connection_timeout = 1000,
+    connect_timeout = 1000,
     read_timeout = 1000,
     send_timeout = 1000,
     max_redirection = 5,
@@ -189,7 +189,7 @@ local config = {
     },
     keepalive_timeout = 60000,
     keepalive_cons = 1000,
-    connection_timeout = 1000,
+    connect_timeout = 1000,
     read_timeout = 1000,
     send_timeout = 1000,
     max_redirection = 5,
@@ -224,7 +224,7 @@ local config = {
     },
     keepalive_timeout = 60000,
     keepalive_cons = 1000,
-    connection_timeout = 1000,
+    connect_timeout = 1000,
     read_timeout = 1000,
     send_timeout = 1000,
     max_redirection = 5,
@@ -264,7 +264,7 @@ local config = {
     },
     keepalive_timeout = 60000,              --redis connection pool idle timeout
     keepalive_cons = 1000,                  --redis connection pool size
-    connection_timeout = 1000,              --timeout while connecting
+    connect_timeout = 1000,              --timeout while connecting
     read_timeout = 1000,                    --timeout while reading
     send_timeout = 1000,                    --timeout while sending
     max_redirection = 5,                    --maximum retry attempts for redirection
@@ -281,6 +281,47 @@ else
     ngx.say(v)
 end
 ```
+6. Use SSL :
+
+  Note: `connect_opts` is optional config field that can be set and will be passed to underlying redis connect call.
+  More information about these options can be found in [lua-resty-redis](https://github.com/openresty/lua-resty-redis#connect) documentation.
+
+```lua
+local config = {
+    dict_name = "test_locks",               --shared dictionary name for locks
+    name = "testCluster",                   --rediscluster name
+    serv_list = {                           --redis cluster node list(host and port),
+        { ip = "127.0.0.1", port = 7001 },
+        { ip = "127.0.0.1", port = 7002 },
+        { ip = "127.0.0.1", port = 7003 },
+        { ip = "127.0.0.1", port = 7004 },
+        { ip = "127.0.0.1", port = 7005 },
+        { ip = "127.0.0.1", port = 7006 }
+    },
+    keepalive_timeout = 60000,              --redis connection pool idle timeout
+    keepalive_cons = 1000,                  --redis connection pool size
+    connect_timeout = 1000,              --timeout while connecting
+    max_redirection = 5,                    --maximum retry attempts for redirection
+    max_connection_attempts = 1,             --maximum retry attempts for connection
+    connect_opts = {
+        ssl = true,
+        ssl_verify = true,
+        server_name = "test-cluster.redis.myhost.com",
+        pool = "redis-cluster-connection-pool",
+        pool_size = 20,
+        backlog = 10
+    }
+}
+
+local redis_cluster = require "rediscluster"
+local red_c = redis_cluster:new(config)
+
+local v, err = red_c:get("name")
+if err then
+    ngx.log(ngx.ERR, "err: ", err)
+else
+    ngx.say(v)
+end
 
 ### Limitation
 

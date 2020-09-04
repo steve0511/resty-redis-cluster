@@ -45,7 +45,7 @@ __DATA__
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,               --timeout while connecting
+                            connect_timeout = 1000,               --timeout while connecting
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -111,7 +111,7 @@ dog: an animal
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,               --timeout while connecting
+                            connect_timeout = 1000,               --timeout while connecting
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -158,7 +158,7 @@ flushall: true
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,               --timeout while connecting
+                            connect_timeout = 1000,               --timeout while connecting
                             max_redirection = 5                     --maximum retry attempts for redirection
                             
             }
@@ -222,7 +222,7 @@ not_found not found.
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,               --timeout while connecting
+                            connect_timeout = 1000,               --timeout while connecting
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -289,7 +289,7 @@ get nokey: 0 (table)
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,               --timeout while connecting
+                            connect_timeout = 1000,               --timeout while connecting
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -408,7 +408,7 @@ connections: 1
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,               --timeout while connecting
+                            connect_timeout = 1000,               --timeout while connecting
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -456,7 +456,7 @@ failed to set connections: nil: ERR wrong number of arguments for 'incr' command
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,               --timeout while connecting
+                            connect_timeout = 1000,               --timeout while connecting
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -530,7 +530,7 @@ lrange result: ["hello","world"]
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,               --timeout while connecting
+                            connect_timeout = 1000,               --timeout while connecting
                             read_timeout = 2500,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -595,7 +595,7 @@ no element popped.
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 200,                --timeout while connecting
+                            connect_timeout = 200,                --timeout while connecting
                             read_timeout = 200,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -659,7 +659,7 @@ lua tcp socket read timed out
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,                --timeout while connecting
+                            connect_timeout = 1000,                --timeout while connecting
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -726,7 +726,7 @@ mget result: ["an animal",null,"an animal"]
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 200,                --timeout while connecting
+                            connect_timeout = 200,                --timeout while connecting
                             read_timeout = 200,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -821,7 +821,7 @@ cow: moo
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,               --timeout while connecting
+                            connect_timeout = 1000,               --timeout while connecting
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
@@ -905,7 +905,7 @@ foo: false, type: string
                                         },
                             keepalive_timeout = 60000,              --redis connection pool idle timeout
                             keepalive_cons = 1000,                  --redis connection pool size
-                            connection_timout = 1000,               --timeout while connecting
+                            connect_timeout = 1000,               --timeout while connecting
                             read_timeout = 200,                     --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
