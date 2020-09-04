@@ -6,6 +6,7 @@ local tostring = tostring
 local string = string
 local type = type
 local table = table
+-- luacheck:ignore ngx
 local ngx = ngx
 local math = math
 local rawget = rawget
@@ -120,19 +121,20 @@ local function try_hosts_slots(self, serv_list)
         end
 
         if ok then
-            local authok, autherr = checkAuth(self, redis_client)
+            local _, autherr = checkAuth(self, redis_client)
             if autherr then
                 table.insert(errors, autherr)
                 return nil, errors
             end
-            local slots_info, err = redis_client:cluster("slots")
+            local slots_info
+            slots_info, err = redis_client:cluster("slots")
             if slots_info then
                 local slots = {}
                 -- while slots are updated, create a list of servers present in cluster
                 -- this can differ from self.config.serv_list if a cluster is resized (added/removed nodes)
                 local servers = { serv_list = {} }
-                for i = 1, #slots_info do
-                    local sub_info = slots_info[i]
+                for n = 1, #slots_info do
+                    local sub_info = slots_info[n]
                     --slot info item 1 and 2 are the subrange start end slots
                     local startslot, endslot = sub_info[1], sub_info[2]
 
@@ -192,6 +194,7 @@ function _M.fetch_slots(self)
     local serv_list = self.config.serv_list
     local serv_list_cached = slot_cache[self.config.name .. "serv_list"]
 
+    -- luacheck:ignore serv_list_combined
     local serv_list_combined = {}
 
     -- if a cached serv_list is present, use it
@@ -201,9 +204,10 @@ function _M.fetch_slots(self)
         serv_list_combined = serv_list
     end
 
+    -- luacheck:ignore serv_list_cached
     serv_list_cached = nil -- important!
 
-    local ok, errors = try_hosts_slots(self, serv_list_combined)
+    local _, errors = try_hosts_slots(self, serv_list_combined)
     if errors then
         local err = "failed to fetch slots: " .. table.concat(errors, ";")
         ngx.log(ngx.ERR, err)
@@ -217,20 +221,21 @@ function _M.init_slots(self)
         -- already initialized
         return true
     end
-    local lock, err = resty_lock:new(self.config.dict_name or DEFAULT_SHARED_DICT_NAME)
+    local ok, lock, elapsed, err
+    lock, err = resty_lock:new(self.config.dict_name or DEFAULT_SHARED_DICT_NAME)
     if not lock then
         ngx.log(ngx.ERR, "failed to create lock in initialization slot cache: ", err)
         return nil, err
     end
 
-    local elapsed, err = lock:lock("redis_cluster_slot_" .. self.config.name)
+    elapsed, err = lock:lock("redis_cluster_slot_" .. self.config.name)
     if not elapsed then
         ngx.log(ngx.ERR, "failed to acquire the lock in initialization slot cache: ", err)
         return nil, err
     end
 
     if slot_cache[self.config.name] then
-        local ok, err = lock:unlock()
+        ok, err = lock:unlock()
         if not ok then
             ngx.log(ngx.ERR, "failed to unlock in initialization slot cache: ", err)
         end
@@ -240,13 +245,13 @@ function _M.init_slots(self)
 
     local _, errs = self:fetch_slots()
     if errs then
-        local ok, err = lock:unlock()
+        ok, err = lock:unlock()
         if not ok then
             ngx.log(ngx.ERR, "failed to unlock in initialization slot cache:", err)
         end
         return nil, errs
     end
-    local ok, err = lock:unlock()
+    ok, err = lock:unlock()
     if not ok then
         ngx.log(ngx.ERR, "failed to unlock in initialization slot cache:", err)
     end
@@ -256,7 +261,7 @@ end
 
 
 
-function _M.new(self, config)
+function _M.new(_, config)
     if not config.name then
         return nil, " redis cluster config name is empty"
     end
@@ -283,7 +288,7 @@ local function pick_node(self, serv_list, slot, magicRadomSeed)
     local index
     if #serv_list < 1 then
         err = "serv_list for slot " .. slot .. " is empty"
-        return host, port, slave, err
+        return nil, nil, nil, err
     end
     if self.config.enableSlaveRead then
         if magicRadomSeed then
@@ -306,7 +311,7 @@ local function pick_node(self, serv_list, slot, magicRadomSeed)
         slave = false
         --ngx.log(ngx.NOTICE, "pickup node: ", cjson.encode(serv_list[1]))
     end
-    return host, port, slave, err
+    return host, port, slave
 end
 
 
@@ -377,6 +382,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
 
         -- We must empty local reference to slots cache, otherwise there will be memory issue while
         -- coroutine swich happens(eg. ngx.sleep, cosocket), very important!
+        -- luacheck: ignore slots
         slots = nil
 
         local ip, port, slave, err
@@ -387,7 +393,9 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         else
             ip, port, slave, err = pick_node(self, serv_list, slot)
             if err then
-                ngx.log(ngx.ERR, "pickup node failed, will return failed for this request, meanwhile refereshing slotcache " .. err)
+                ngx.log(ngx.ERR,
+                        "pickup node failed, will return failed for this request, meanwhile refereshing slotcache "
+                         .. err)
                 self:fetch_slots()
                 return nil, err
             end
@@ -400,13 +408,13 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
         local ok, connerr = redis_client:connect(ip, port, self.config.connect_opts)
 
         if ok then
-            local authok, autherr = checkAuth(self, redis_client)
+            local _, autherr = checkAuth(self, redis_client)
             if autherr then
                 return nil, autherr
             end
             if slave then
                 --set readonly
-                local ok, err = redis_client:readonly()
+                ok, err = redis_client:readonly()
                 if not ok then
                     self:fetch_slots()
                     return nil, err
@@ -415,7 +423,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
 
             if asking then
                 --executing asking
-                local ok, err = redis_client:asking()
+                ok, err = redis_client:asking()
                 if not ok then
                     self:fetch_slots()
                     return nil, err
@@ -423,7 +431,7 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
             end
 
             local needToRetry = false
-            local res, err
+            local res
             if cmd == "eval" or cmd == "evalsha" then
                 res, err = redis_client[cmd](redis_client, ...)
             else
@@ -432,7 +440,6 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
 
             if err then
                 if string.sub(err, 1, 5) == "MOVED" then
-                    --ngx.log(ngx.NOTICE, "find MOVED signal, trigger retry for normal commands, cmd:" .. cmd .. " key:" .. key)
                     --if retry with moved, we will not asking to specific ip,port anymore
                     releaseConnection(redis_client, config)
                     targetIp = nil
@@ -441,7 +448,6 @@ local function handleCommandWithRetry(self, targetIp, targetPort, asking, cmd, k
                     needToRetry = true
 
                 elseif string.sub(err, 1, 3) == "ASK" then
-                    --ngx.log(ngx.NOTICE, "handle asking for normal commands, cmd:" .. cmd .. " key:" .. key)
                     releaseConnection(redis_client, config)
                     if asking then
                         --Should not happen after asking target ip,port and still return ask, if so, return error.
@@ -482,8 +488,8 @@ end
 
 
 local function generateMagicSeed(self)
-    --For pipeline, We don't want request to be forwarded to all channels, eg. if we have 3*3 cluster(3 master 2 replicas) we
-    --alway want pick up specific 3 nodes for pipeline requests, instead of 9.
+    --For pipeline, We don't want request to be forwarded to all channels, eg. if we have 3*3 cluster
+    --(3 master 2 replicas) we always want pick up specific 3 nodes for pipeline requests, instead of 9.
     --Currently we simply use (num of allnode)%count as a randomly fetch. Might consider a better way in the future.
     -- use the dynamic serv_list instead of the static config serv_list
     local nodeCount = #slot_cache[self.config.name .. "serv_list"].serv_list
@@ -499,7 +505,7 @@ local function _do_cmd_master(self, cmd, key, ...)
                                   self.config.read_timeout or DEFAULT_READ_TIMEOUT)
         local ok, err = redis_client:connect(master.ip, master.port, self.config.connect_opts)
         if ok then
-            ok, err = redis_client[cmd](redis_client, key, ...)
+            _, err = redis_client[cmd](redis_client, key, ...)
         end
         if err then
             table.insert(errors, err)
@@ -542,21 +548,21 @@ local function constructFinalPipelineRes(self, node_res_map, node_req_map)
             --deal with redis cluster ask redirection
             local askHost, askPort = parseAskSignal(res[i])
             if askHost ~= nil and askPort ~= nil then
-                --ngx.log(ngx.NOTICE, "handle ask signal for cmd:" .. reqs[i]["cmd"] .. " key:" .. reqs[i]["key"] .. " target host:" .. askHost .. " target port:" .. askPort)
-                local askres, err = handleCommandWithRetry(self, askHost, askPort, true, reqs[i]["cmd"], reqs[i]["key"], unpack(reqs[i]["args"]))
+                local askres, err = handleCommandWithRetry(self, askHost, askPort, true, reqs[i]["cmd"], reqs[i]["key"],
+                                                           unpack(reqs[i]["args"]))
                 if err then
                     return nil, err
                 else
                     finalret[reqs[i].origin_index] = askres
                 end
             elseif hasMovedSignal(res[i]) then
-                --ngx.log(ngx.NOTICE, "handle moved signal for cmd:" .. reqs[i]["cmd"] .. " key:" .. reqs[i]["key"])
                 if needToFetchSlots then
                     -- if there is multiple signal for moved, we just need to fetch slot cache once, and do retry.
                     self:fetch_slots()
                     needToFetchSlots = false
                 end
-                local movedres, err = handleCommandWithRetry(self, nil, nil, false, reqs[i]["cmd"], reqs[i]["key"], unpack(reqs[i]["args"]))
+                local movedres, err = handleCommandWithRetry(self, nil, nil, false, reqs[i]["cmd"], reqs[i]["key"],
+                                                             unpack(reqs[i]["args"]))
                 if err then
                     return nil, err
                 else
@@ -598,7 +604,6 @@ function _M.commit_pipeline(self)
 
     self._reqs = nil
     local config = self.config
-    local needToRetry = false
 
     local slots = slot_cache[config.name]
     if slots == nil then
@@ -626,6 +631,7 @@ function _M.commit_pipeline(self)
         if err then
             -- We must empty local reference to slots cache, otherwise there will be memory issue while
             -- coroutine swich happens(eg. ngx.sleep, cosocket), very important!
+            -- luacheck: ignore slots
             slots = nil
             self:fetch_slots()
             return nil, err
@@ -655,14 +661,14 @@ function _M.commit_pipeline(self)
                                   config.read_timeout or DEFAULT_READ_TIMEOUT)
         local ok, err = redis_client:connect(ip, port, self.config.connect_opts)
 
-        local authok, autherr = checkAuth(self, redis_client)
+        local _, autherr = checkAuth(self, redis_client)
         if autherr then
             return nil, autherr
         end
 
         if slave then
             --set readonly
-            local ok, err = redis_client:readonly()
+            ok, err = redis_client:readonly()
             if not ok then
                 self:fetch_slots()
                 return nil, err
@@ -682,7 +688,8 @@ function _M.commit_pipeline(self)
                     redis_client[req.cmd](redis_client, req.key)
                 end
             end
-            local res, err = redis_client:commit_pipeline()
+            local res
+            res, err = redis_client:commit_pipeline()
             if err then
                 --There might be node fail, we should also refresh slot cache
                 self:fetch_slots()
@@ -734,7 +741,7 @@ eval(script, 0, arg1, arg2 ...)
 end
 -- dynamic cmd
 setmetatable(_M, {
-    __index = function(self, cmd)
+    __index = function(_, cmd)
         local method =
         function(self, ...)
             if cmd == "eval" or cmd == "evalsha" then
