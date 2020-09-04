@@ -15,7 +15,9 @@ local ipairs = ipairs
 local tonumber = tonumber
 local match = string.match
 local char = string.char
-
+local table_insert = table.insert
+local string_find = string.find
+local redis_crc = xmodem.redis_crc
 
 local DEFAULT_SHARED_DICT_NAME = "redis_cluster_slot_locks"
 local DEFAULT_MAX_REDIRECTION = 5
@@ -27,8 +29,8 @@ local DEFAULT_SEND_TIMEOUT = 1000
 local DEFAULT_READ_TIMEOUT = 1000
 
 local function parse_key(key_str)
-    local left_tag_single_index = string.find(key_str, "{", 0)
-    local right_tag_single_index = string.find(key_str, "}", 0)
+    local left_tag_single_index = string_find(key_str, "{", 0)
+    local right_tag_single_index = string_find(key_str, "}", 0)
     if left_tag_single_index and right_tag_single_index then
         --parse hashtag
         return key_str.sub(key_str, left_tag_single_index + 1, right_tag_single_index - 1)
@@ -56,7 +58,7 @@ local cluster_invalid_cmds = {
 }
 
 local function redis_slot(str)
-    return xmodem.redis_crc(parse_key(str))
+    return redis_crc(parse_key(str))
 end
 
 local function check_auth(self, redis_client)
@@ -89,7 +91,7 @@ end
 local function split(s, delimiter)
     local result = {};
     for m in (s..delimiter):gmatch("(.-)"..delimiter) do
-        table.insert(result, m);
+        table_insert(result, m);
     end
     return result;
 end
@@ -115,14 +117,14 @@ local function try_hosts_slots(self, serv_list)
             if ok then break end
             if err then
                 ngx.log(ngx.ERR,"unable to connect, attempt nr ", k, " : error: ", err)
-                table.insert(errors, err)
+                table_insert(errors, err)
             end
         end
 
         if ok then
             local _, autherr = check_auth(self, redis_client)
             if autherr then
-                table.insert(errors, autherr)
+                table_insert(errors, autherr)
                 return nil, errors
             end
             local slots_info
@@ -155,7 +157,7 @@ local function try_hosts_slots(self, serv_list)
                 slot_cache[self.config.name] = slots
                 slot_cache[self.config.name .. "serv_list"] = servers
             else
-                table.insert(errors, err)
+                table_insert(errors, err)
             end
             -- cache master nodes
             local nodes_res, nerr = redis_client:cluster("nodes")
@@ -167,7 +169,7 @@ local function try_hosts_slots(self, serv_list)
                         local is_master = match(node_info[3], "master") ~= nil
                         if is_master then
                             local ip_port = split(split(node_info[2], "@")[1], ":")
-                            table.insert(master_nodes, {
+                            table_insert(master_nodes, {
                                 ip = ip_port[1],
                                 port = tonumber(ip_port[2])
                             })
@@ -175,11 +177,11 @@ local function try_hosts_slots(self, serv_list)
                     end
                 end
             else
-                table.insert(errors, nerr)
+                table_insert(errors, nerr)
             end
             release_connection(redis_client, config)
         else
-            table.insert(errors, err)
+            table_insert(errors, err)
         end
         if #errors == 0 then
             return true, nil
@@ -502,7 +504,7 @@ local function _do_cmd_master(self, cmd, key, ...)
             _, err = redis_client[cmd](redis_client, key, ...)
         end
         if err then
-            table.insert(errors, err)
+            table_insert(errors, err)
         end
         release_connection(redis_client, self.config)
     end
@@ -518,7 +520,7 @@ local function _do_cmd(self, cmd, key, ...)
     if _reqs then
         local args = { ... }
         local t = { cmd = cmd, key = key, args = args }
-        table.insert(_reqs, t)
+        table_insert(_reqs, t)
         return
     end
 
