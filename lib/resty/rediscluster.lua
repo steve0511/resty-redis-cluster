@@ -180,6 +180,12 @@ local function try_hosts_slots(self, serv_list)
                 table_insert(errors, nerr)
             end
             release_connection(redis_client, config)
+            
+            -- refresh of slots and master nodes successful
+            -- not required to connect/iterate over additional hosts
+            if nodes_res and slots_info then
+                return true, nil
+            end
         else
             table_insert(errors, err)
         end
