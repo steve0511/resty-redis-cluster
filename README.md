@@ -322,6 +322,7 @@ if err then
 else
     ngx.say(v)
 end
+```
 
 ### Limitation
 
