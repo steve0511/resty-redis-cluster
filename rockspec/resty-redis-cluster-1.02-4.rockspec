@@ -1,21 +1,17 @@
 package = "resty-redis-cluster"
-version = "1.0-2"
+version = "1.02-4"
 source = {
-    url = "https://github.com/steve0511/resty-redis-cluster/"
-    tag = "1.02"
+    url = "git://github.com/steve0511/resty-redis-cluster",
+    tag = "1.02",
 }
 description = {
     summary = "Openresty lua client for redis cluster",
     detailed = [[
         Openresty environment lua client with redis cluster support.
-        This is a wrapper around the 'resty.redis' library with cluster discovery 
+        This is a wrapper around the 'resty.redis' library with cluster discovery
         and failover recovery support.
     ]],
     license = "Apache License 2.0"
-}
-dependencies = {
-    "lua >= 5.1",
-    "lua-resty-redis"
 }
 build = {
     type = "builtin",
