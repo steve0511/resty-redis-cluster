@@ -43,18 +43,17 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 
 ### installation
 
-1. please compile and generate librestyredisslot.so from redis_slot.c (can done by gcc)
-
-2. please add xmodem.lua and rediscluster.lua at lualib, Also please add library:lua-resty-redis and lua-resty-lock
+1. please add xmodem.lua and rediscluster.lua at lualib, Also please add library:lua-resty-redis and lua-resty-lock
    
    nginx.conf like:
 
    lua_package_path "/path/lualib/?.lua;";
-   lua_package_cpath "/path/lualib/?.so;";
 
-3. nginx.conf add config:
+2. nginx.conf add config:
 
    lua_shared_dict redis_cluster_slot_locks 100k;
+   
+3. or install by luarock, link: https://luarocks.org/modules/steve0511/resty-redis-cluster 
 
 ### Sample usage
 
