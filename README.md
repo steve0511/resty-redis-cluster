@@ -61,7 +61,6 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 
 ```lua
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks
     name = "testCluster",                   --rediscluster name
     serv_list = {                           --redis cluster node list(host and port),
         { ip = "127.0.0.1", port = 7001 },
@@ -287,7 +286,7 @@ end
 
 ```lua
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks
+    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
     name = "testCluster",                   --rediscluster name
     serv_list = {                           --redis cluster node list(host and port),
         { ip = "127.0.0.1", port = 7001 },
