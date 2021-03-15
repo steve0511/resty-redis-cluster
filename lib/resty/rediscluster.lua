@@ -20,6 +20,7 @@ local string_find = string.find
 local redis_crc = xmodem.redis_crc
 
 local DEFAULT_SHARED_DICT_NAME = "redis_cluster_slot_locks"
+local DEFAULT_REFRESH_DICT_NAME = "refresh_lock"
 local DEFAULT_MAX_REDIRECTION = 5
 local DEFAULT_MAX_CONNECTION_ATTEMPTS = 3
 local DEFAULT_KEEPALIVE_TIMEOUT = 55000
@@ -221,6 +222,30 @@ function _M.fetch_slots(self)
 end
 
 
+function _M.refresh_slots(self)
+    local worker_id = ngx.worker.id()
+    local lock, err, elapsed, ok
+    lock, err = resty_lock:new(self.config.dict_name or DEFAULT_SHARED_DICT_NAME, {time_out = 0})
+    if not lock then
+        ngx.log(ngx.ERR, "failed to create lock in refresh slot cache: ", err)
+        return nil, err
+    end
+
+    local refresh_lock_key = (self.config.refresh_lock_key or DEFAULT_REFRESH_DICT_NAME) .. worker_id
+    elapsed, err = lock:lock(refresh_lock_key)
+    if not elapsed then
+        return nil, 'race refresh lock fail, ' .. err
+    end
+
+    self:fetch_slots()
+    ok, err = lock:unlock()
+    if not ok then
+        ngx.log(ngx.ERR, "failed to unlock in refresh slot cache:", err)
+        return nil, err
+    end
+end
+
+
 function _M.init_slots(self)
     if slot_cache[self.config.name] then
         -- already initialized
@@ -396,7 +421,7 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
             ip, port, slave, err = pick_node(self, serv_list, slot)
             if err then
                 ngx.log(ngx.ERR, "pickup node failed, will return failed for this request, meanwhile refereshing slotcache " .. err)
-                self:fetch_slots()
+                self:refresh_slots()
                 return nil, err
             end
         end
@@ -416,7 +441,7 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
                 --set readonly
                 ok, err = redis_client:readonly()
                 if not ok then
-                    self:fetch_slots()
+                    self:refresh_slots()
                     return nil, err
                 end
             end
@@ -425,7 +450,7 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
                 --executing asking
                 ok, err = redis_client:asking()
                 if not ok then
-                    self:fetch_slots()
+                    self:refresh_slots()
                     return nil, err
                 end
             end
@@ -445,7 +470,7 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
                     release_connection(redis_client, config)
                     target_ip = nil
                     target_port = nil
-                    self:fetch_slots()
+                    self:refresh_slots()
                     need_to_retry = true
 
                 elseif string.sub(err, 1, 3) == "ASK" then
@@ -468,7 +493,7 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
                     return nil, "Cannot executing command, cluster status is failed!"
                 else
                     --There might be node fail, we should also refresh slot cache
-                    self:fetch_slots()
+                    self:refresh_slots()
                     return nil, err
                 end
             end
@@ -478,7 +503,7 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
             end
         else
             --There might be node fail, we should also refresh slot cache
-            self:fetch_slots()
+            self:refresh_slots()
             if k == config.max_redirection or k == DEFAULT_MAX_REDIRECTION then
                 -- only return after allowing for `k` attempts
                 return nil, connerr
@@ -561,7 +586,7 @@ local function construct_final_pipeline_resp(self, node_res_map, node_req_map)
                 --ngx.log(ngx.NOTICE, "handle moved signal for cmd:" .. reqs[i]["cmd"] .. " key:" .. reqs[i]["key"])
                 if need_to_fetch_slots then
                     -- if there is multiple signal for moved, we just need to fetch slot cache once, and do retry.
-                    self:fetch_slots()
+                    self:refresh_slots()
                     need_to_fetch_slots = false
                 end
                 local movedres, err = handle_command_with_retry(self, nil, nil, false, reqs[i]["cmd"], reqs[i]["key"], unpack(reqs[i]["args"]))
@@ -634,7 +659,7 @@ function _M.commit_pipeline(self)
             -- We must empty local reference to slots cache, otherwise there will be memory issue while
             -- coroutine swich happens(eg. ngx.sleep, cosocket), very important!
             slots = nil
-            self:fetch_slots()
+            self:refresh_slots()
             return nil, err
         end
 
@@ -671,7 +696,7 @@ function _M.commit_pipeline(self)
             --set readonly
             local ok, err = redis_client:readonly()
             if not ok then
-                self:fetch_slots()
+                self:refresh_slots()
                 return nil, err
             end
         end
@@ -692,7 +717,7 @@ function _M.commit_pipeline(self)
             local res, err = redis_client:commit_pipeline()
             if err then
                 --There might be node fail, we should also refresh slot cache
-                self:fetch_slots()
+                self:refresh_slots()
                 return nil, err .. " return from " .. tostring(ip) .. ":" .. tostring(port)
             end
 
@@ -703,7 +728,7 @@ function _M.commit_pipeline(self)
             node_res_map[k] = res
         else
             --There might be node fail, we should also refresh slot cache
-            self:fetch_slots()
+            self:refresh_slots()
             return nil, err .. "pipeline commit failed while connecting to " .. tostring(ip) .. ":" .. tostring(port)
         end
     end
