@@ -61,6 +61,8 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 
 ```lua
 local config = {
+    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
+    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
     name = "testCluster",                   --rediscluster name
     serv_list = {                           --redis cluster node list(host and port),
         { ip = "127.0.0.1", port = 7001 },
@@ -91,6 +93,8 @@ end
   
 ```lua
 local config = {
+    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
+    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
     name = "testCluster",                   --rediscluster name
     serv_list = {                           --redis cluster node list(host and port),
         { ip = "127.0.0.1", port = 7001 },
@@ -127,6 +131,8 @@ end
 local cjson = require "cjson"
 
 local config = {
+    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
+    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
     name = "testCluster",
     serv_list = {
         { ip = "127.0.0.1", port = 7001 },
@@ -175,6 +181,8 @@ end
 local cjson = require "cjson"
 
 local config = {
+    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
+    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
     name = "testCluster",
     enable_slave_read = true,
     serv_list = {
@@ -210,6 +218,8 @@ end
 local cjson = require "cjson"
 
 local config = {
+    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
+    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
     name = "testCluster",
     enable_slave_read = true,
     serv_list = {
@@ -251,6 +261,8 @@ end
 
 ```lua
 local config = {
+    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
+    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
     name = "testCluster",                   --rediscluster name
     serv_list = {                           --redis cluster node list(host and port),
         { ip = "127.0.0.1", port = 7001 },
@@ -287,6 +299,7 @@ end
 ```lua
 local config = {
     dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
+    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
     name = "testCluster",                   --rediscluster name
     serv_list = {                           --redis cluster node list(host and port),
         { ip = "127.0.0.1", port = 7001 },
