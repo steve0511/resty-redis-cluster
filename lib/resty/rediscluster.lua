@@ -98,22 +98,32 @@ local function split(s, delimiter)
 end
 
 local function try_hosts_slots(self, serv_list)
+    local start_time = ngx.req.start_time()
     local errors = {}
     local config = self.config
     if #serv_list < 1 then
         return nil, "failed to fetch slots, serv_list config is empty"
     end
+
     for i = 1, #serv_list do
         local ip = serv_list[i].ip
         local port = serv_list[i].port
         local redis_client = redis:new()
-        local ok, err
+        local ok, err, max_connection_timeout_err
         redis_client:set_timeouts(config.connect_timeout or DEFAULT_CONNECTION_TIMEOUT,
                                   config.send_timeout or DEFAULT_SEND_TIMEOUT,
                                   config.read_timeout or DEFAULT_READ_TIMEOUT)
 
         --attempt to connect DEFAULT_MAX_CONNECTION_ATTEMPTS times to redis
         for k = 1, config.max_connection_attempts or DEFAULT_MAX_CONNECTION_ATTEMPTS do
+            local total_connection_time_ms = (ngx.now() - start_time) * 1000
+            if (config.max_connection_timeout and total_connection_time_ms > config.max_connection_timeout) then
+                max_connection_timeout_err = "max_connection_timeout of " .. config.max_connection_timeout .. "ms reached."
+                ngx.log(ngx.ERR, max_connection_timeout_err)
+                table_insert(errors, max_connection_timeout_err)
+                break
+            end
+
             ok, err = redis_client:connect(ip, port, self.config.connect_opts)
             if ok then break end
             if err then
@@ -181,12 +191,14 @@ local function try_hosts_slots(self, serv_list)
                 table_insert(errors, nerr)
             end
             release_connection(redis_client, config)
-            
+
             -- refresh of slots and master nodes successful
             -- not required to connect/iterate over additional hosts
             if nodes_res and slots_info then
                 return true, nil
             end
+        elseif max_connection_timeout_err then
+            break
         else
             table_insert(errors, err)
         end
