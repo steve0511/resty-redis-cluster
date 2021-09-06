@@ -98,7 +98,7 @@ local function split(s, delimiter)
 end
 
 local function try_hosts_slots(self, serv_list)
-    local start_time = ngx.req.start_time()
+    local start_time = ngx.now()
     local errors = {}
     local config = self.config
     if #serv_list < 1 then
