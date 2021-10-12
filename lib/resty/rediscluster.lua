@@ -214,12 +214,19 @@ function _M.fetch_slots(self)
     local serv_list = self.config.serv_list
     local serv_list_cached = slot_cache[self.config.name .. "serv_list"]
 
-    local serv_list_combined = {}
+    local serv_list_combined
 
-    -- if a cached serv_list is present, use it
+    -- if a cached serv_list is present, start with that
     if serv_list_cached then
         serv_list_combined = serv_list_cached.serv_list
+
+        -- then append the serv_list from config, in the event that the entire
+        -- cached serv_list no longer points to anything usable
+        for _, s in ipairs(serv_list) do
+            table_insert(serv_list_combined, s)
+        end
     else
+        -- otherwise we bootstrap with our serv_list from config
         serv_list_combined = serv_list
     end
 
