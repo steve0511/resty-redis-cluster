@@ -706,20 +706,21 @@ function _M.commit_pipeline(self)
                                   config.read_timeout or DEFAULT_READ_TIMEOUT)
         local ok, err = redis_client:connect(ip, port, self.config.connect_opts)
 
-        local authok, autherr = check_auth(self, redis_client)
-        if autherr then
-            return nil, autherr
-        end
-
-        if slave then
-            --set readonly
-            local ok, err = redis_client:readonly()
-            if not ok then
-                self:refresh_slots()
-                return nil, err
-            end
-        end
         if ok then
+            local authok, autherr = check_auth(self, redis_client)
+            if autherr then
+                return nil, autherr
+            end
+
+            if slave then
+                --set readonly
+                local ok, err = redis_client:readonly()
+                if not ok then
+                    self:refresh_slots()
+                    return nil, err
+                end
+            end
+
             redis_client:init_pipeline()
             for i = 1, #reqs do
                 local req = reqs[i]
