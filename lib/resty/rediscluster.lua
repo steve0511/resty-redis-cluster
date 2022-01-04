@@ -58,6 +58,11 @@ local cluster_invalid_cmds = {
     ["shutdown"] = true
 }
 
+local cmds_with_sub_cmd = {
+    ["object"] = 2, -- offset to key (which means for command "object", slot key is at offset 2)
+    ["pubsub"] = 2
+}
+
 local function redis_slot(str)
     return redis_crc(parse_key(str))
 end
@@ -476,7 +481,7 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
 
             local need_to_retry = false
             local res
-            if cmd == "eval" or cmd == "evalsha" then
+            if cmd == "eval" or cmd == "evalsha" or cmds_with_sub_cmd[cmd] then
                 res, err = redis_client[cmd](redis_client, ...)
             else
                 res, err = redis_client[cmd](redis_client, key, ...)
@@ -784,6 +789,21 @@ eval(script, 0, arg1, arg2 ...)
     local key = args[3] or "no_key"
     return _do_cmd(self, cmd, key, ...)
 end
+
+local function _do_sub_cmd(self, cmd, ...)
+    --[[
+    command usage:
+    object subcommand [arguments]
+        e.g object idletime "mylist"
+    pubsub subcommand [arguments]
+        e.g pubsub channels
+    ]]
+    local args = {...}
+    local key_index = cmds_with_sub_cmd[cmd]
+    local key = args[key_index] or "no_key"
+    return _do_cmd(self, cmd, key, ...)
+end
+
 -- dynamic cmd
 setmetatable(_M, {
     __index = function(_, cmd)
@@ -791,6 +811,8 @@ setmetatable(_M, {
         function(self, ...)
             if cmd == "eval" or cmd == "evalsha" then
                 return _do_eval_cmd(self, cmd, ...)
+            elseif cmds_with_sub_cmd[cmd] then
+                return _do_sub_cmd(self, cmd, ...)
             else
                 return _do_cmd(self, cmd, ...)
             end
