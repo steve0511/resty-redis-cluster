@@ -97,7 +97,7 @@ local function split(s, delimiter)
 end
 
 local function try_hosts_slots(self, serv_list)
-    local start_time = ngx.req.start_time()
+    local start_time = ngx.now()
     local errors = {}
     local config = self.config
     if #serv_list < 1 then
@@ -197,12 +197,19 @@ function _M.fetch_slots(self)
     local serv_list = self.config.serv_list
     local serv_list_cached = slot_cache[self.config.name .. "serv_list"]
 
-    local serv_list_combined = {}
+    local serv_list_combined
 
-    -- if a cached serv_list is present, use it
+    -- if a cached serv_list is present, start with that
     if serv_list_cached then
         serv_list_combined = serv_list_cached.serv_list
+
+        -- then append the serv_list from config, in the event that the entire
+        -- cached serv_list no longer points to anything usable
+        for _, s in ipairs(serv_list) do
+            table_insert(serv_list_combined, s)
+        end
     else
+        -- otherwise we bootstrap with our serv_list from config
         serv_list_combined = serv_list
     end
 
@@ -668,20 +675,21 @@ function _M.commit_pipeline(self)
                                   config.read_timeout or DEFAULT_READ_TIMEOUT)
         local ok, err = redis_client:connect(ip, port, self.config.connect_opts)
 
-        local authok, autherr = check_auth(self, redis_client)
-        if autherr then
-            return nil, autherr
-        end
-
-        if slave then
-            --set readonly
-            local ok, err = redis_client:readonly()
-            if not ok then
-                self:refresh_slots()
-                return nil, err
-            end
-        end
         if ok then
+            local authok, autherr = check_auth(self, redis_client)
+            if autherr then
+                return nil, autherr
+            end
+
+            if slave then
+                --set readonly
+                local ok, err = redis_client:readonly()
+                if not ok then
+                    self:refresh_slots()
+                    return nil, err
+                end
+            end
+
             redis_client:init_pipeline()
             for i = 1, #reqs do
                 local req = reqs[i]

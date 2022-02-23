@@ -1,8 +1,8 @@
 package = "resty-redis-cluster"
-version = "1.04-1"
+version = "1.05-1"
 source = {
     url = "git://github.com/steve0511/resty-redis-cluster",
-    tag = "1.04",
+    tag = "1.05",
 }
 description = {
     summary = "Openresty lua client for redis cluster",
