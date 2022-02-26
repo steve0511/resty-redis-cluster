@@ -61,10 +61,11 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 
 ```lua
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
-    name = "testCluster",                   --rediscluster name
-    serv_list = {                           --redis cluster node list(host and port),
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
+    name = "testCluster",                     --rediscluster name
+    serv_list = {                             --redis cluster node list(host and port),
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
         { ip = "127.0.0.1", port = 7003 },
@@ -93,10 +94,11 @@ end
   
 ```lua
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
-    name = "testCluster",                   --rediscluster name
-    serv_list = {                           --redis cluster node list(host and port),
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
+    name = "testCluster",                     --rediscluster name
+    serv_list = {                             --redis cluster node list(host and port),
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
         { ip = "127.0.0.1", port = 7003 },
@@ -131,8 +133,9 @@ end
 local cjson = require "cjson"
 
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
     name = "testCluster",
     serv_list = {
         { ip = "127.0.0.1", port = 7001 },
@@ -181,8 +184,9 @@ end
 local cjson = require "cjson"
 
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
     name = "testCluster",
     enable_slave_read = true,
     serv_list = {
@@ -218,8 +222,9 @@ end
 local cjson = require "cjson"
 
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
     name = "testCluster",
     enable_slave_read = true,
     serv_list = {
@@ -261,10 +266,11 @@ end
 
 ```lua
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
-    name = "testCluster",                   --rediscluster name
-    serv_list = {                           --redis cluster node list(host and port),
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
+    name = "testCluster",                     --rediscluster name
+    serv_list = {                             --redis cluster node list(host and port),
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
         { ip = "127.0.0.1", port = 7003 },
@@ -298,10 +304,11 @@ end
 
 ```lua
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
-    name = "testCluster",                   --rediscluster name
-    serv_list = {                           --redis cluster node list(host and port),
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
+    name = "testCluster",                     --rediscluster name
+    serv_list = {                             --redis cluster node list(host and port),
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
         { ip = "127.0.0.1", port = 7003 },
