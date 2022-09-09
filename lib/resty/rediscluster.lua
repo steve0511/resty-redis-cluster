@@ -412,13 +412,13 @@ end
 local function handle_command_with_retry(self, target_ip, target_port, asking, cmd, key, ...)
     local config = self.config
 
-    key = tostring(key)
-    local slot = redis_slot(key)
+    -- key will be passed to resty.redis
+    local slot = redis_slot(tostring(key))
 
     for k = 1, config.max_redirection or DEFAULT_MAX_REDIRECTION do
 
         if k > 1 then
-            ngx.log(ngx.NOTICE, "handle retry attempts:" .. k .. " for cmd:" .. cmd .. " key:" .. key)
+            ngx.log(ngx.NOTICE, "handle retry attempts:" .. k .. " for cmd:" .. cmd .. " key:" .. tostring(key))
         end
 
         local slots = slot_cache[self.config.name]
@@ -484,7 +484,7 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
 
             if err then
                 if string.sub(err, 1, 5) == "MOVED" then
-                    --ngx.log(ngx.NOTICE, "find MOVED signal, trigger retry for normal commands, cmd:" .. cmd .. " key:" .. key)
+                    --ngx.log(ngx.NOTICE, "find MOVED signal, trigger retry for normal commands, cmd:" .. cmd .. " key:" .. tostring(key))
                     --if retry with moved, we will not asking to specific ip,port anymore
                     release_connection(redis_client, config)
                     target_ip = nil
@@ -493,7 +493,7 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
                     need_to_retry = true
 
                 elseif string.sub(err, 1, 3) == "ASK" then
-                    --ngx.log(ngx.NOTICE, "handle asking for normal commands, cmd:" .. cmd .. " key:" .. key)
+                    --ngx.log(ngx.NOTICE, "handle asking for normal commands, cmd:" .. cmd .. " key:" .. tostring(key))
                     release_connection(redis_client, config)
                     if asking then
                         --Should not happen after asking target ip,port and still return ask, if so, return error.

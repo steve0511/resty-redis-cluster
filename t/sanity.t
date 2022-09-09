@@ -49,7 +49,7 @@ __DATA__
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -115,7 +115,7 @@ dog: an animal
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -160,7 +160,7 @@ flushall: true
                             keepalive_cons = 1000,                  --redis connection pool size
                             connect_timeout = 1000,               --timeout while connecting
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -193,7 +193,7 @@ flushall: true
                 ngx.say("get not_found: ", res)
             end
 
-            
+
         ';
     }
 --- request
@@ -226,7 +226,7 @@ not_found not found.
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -259,7 +259,7 @@ not_found not found.
                 ngx.say("get nokey: ", #res, " (", type(res), ")")
             end
 
-            
+
         ';
     }
 --- request
@@ -293,7 +293,7 @@ get nokey: 0 (table)
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -373,7 +373,7 @@ get nokey: 0 (table)
 
             ngx.say("connections: ", res)
 
-            
+
         ';
     }
 --- request
@@ -412,7 +412,7 @@ connections: 1
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -460,7 +460,7 @@ failed to set connections: nil: ERR wrong number of arguments for 'incr' command
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -499,7 +499,7 @@ failed to set connections: nil: ERR wrong number of arguments for 'incr' command
             local cjson = require "cjson"
             ngx.say("lrange result: ", cjson.encode(res))
 
-            
+
         ';
     }
 --- request
@@ -534,7 +534,7 @@ lrange result: ["hello","world"]
                             read_timeout = 2500,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -565,7 +565,7 @@ lrange result: ["hello","world"]
             local cjson = require "cjson"
             ngx.say("blpop result: ", cjson.encode(res))
 
-            
+
         ';
     }
 --- request
@@ -599,7 +599,7 @@ no element popped.
                             read_timeout = 200,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -630,7 +630,7 @@ no element popped.
             local cjson = require "cjson"
             ngx.say("blpop result: ", cjson.encode(res))
 
-            
+
         ';
     }
 --- request
@@ -663,7 +663,7 @@ lua tcp socket read timed out
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -686,7 +686,7 @@ lua tcp socket read timed out
             end
 
             ngx.say("set dog: ", res)
-            
+
 
             local res, err = red:mget("dog{111}", "cat{111}", "dog{111}")
             if err then
@@ -697,7 +697,7 @@ lua tcp socket read timed out
             local cjson = require "cjson"
             ngx.say("mget result: ", cjson.encode(res))
 
-            
+
         ';
     }
 --- request
@@ -730,7 +730,7 @@ mget result: ["an animal",null,"an animal"]
                             read_timeout = 200,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -789,7 +789,7 @@ mget result: ["an animal",null,"an animal"]
             ngx.say("cat: ", h.cat)
             ngx.say("cow: ", h.cow)
 
-            
+
         ';
     }
 --- request
@@ -825,7 +825,7 @@ cow: moo
                             read_timeout = 1000,                    --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             local redis = require "resty.rediscluster"
             local red, err = redis:new(config)
@@ -909,7 +909,7 @@ foo: false, type: string
                             read_timeout = 200,                     --timeout while reading
                             send_timeout = 1000,                    --timeout while sending
                             max_redirection = 5                     --maximum retry attempts for redirection
-                            
+
             }
             package.loaded["resty.rediscluster"] = nil
             local redis = require "resty.rediscluster"
@@ -930,3 +930,90 @@ GET /t
 --- timeout: 3
 --- no_error_log
 [alert]
+
+=== TEST 14: custom cmd (array_to_hash) and table key
+--- http_config eval: $::HttpConfig
+--- config
+    location /t {
+        content_by_lua '
+
+            local config = {
+                            name = "testCluster",                   --rediscluster name
+                            serv_list = {                           --redis cluster node list(host and port),
+                                            { ip = "127.0.0.1", port = 700 },
+                                            { ip = "127.0.0.1", port = 701 },
+                                            { ip = "127.0.0.1", port = 702 },
+                                            { ip = "127.0.0.1", port = 703 },
+                                            { ip = "127.0.0.1", port = 704 },
+                                            { ip = "127.0.0.1", port = 705 },
+                                            { ip = "127.0.0.1", port = 706 }
+                                        },
+                            keepalive_timeout = 60000,              --redis connection pool idle timeout
+                            keepalive_cons = 1000,                  --redis connection pool size
+                            connect_timeout = 1000,               --timeout while connecting
+                            read_timeout = 1000,                    --timeout while reading
+                            send_timeout = 1000,                    --timeout while sending
+                            max_redirection = 5,                    --maximum retry attempts for redirection
+                            connect_opts = {
+                                                backlog = 30,
+                                                pool_size = 30,
+                                                ssl = false,
+                                                ssl_verify = false,
+                                            },
+
+            }
+
+            local redis = require "resty.rediscluster"
+            local red, err = redis:new(config)
+
+            if err then
+                ngx.say("failed to create redis cluster client: ", err)
+                return
+            end
+
+            local ok, err = red:flushall()
+            if not ok then
+                ngx.say("failed to flush all: ", err)
+                return
+            end
+
+            local res, err = red:hmset("animals", { dog = "bark", cat = "meow", cow = "moo" })
+            if not res then
+                ngx.say("failed to set hm animals: ", err)
+                return
+            end
+
+            ngx.say("hmset animals: ", res)
+
+            red:init_pipeline()
+            red:hgetall("animals")
+
+            local res, err = red:commit_pipeline()
+            if err then
+                ngx.say("failed to get hm animals: ", err)
+                return
+            end
+
+            if not res then
+                ngx.say("hm animals not found.")
+                return
+            end
+
+            if next(res) ~= nil then
+                res = red:array_to_hash(res[1])
+            end
+
+            ngx.say("dog: ", res.dog)
+            ngx.say("cat: ", res.cat)
+            ngx.say("cow: ", res.cow)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+hmset animals: OK
+dog: bark
+cat: meow
+cow: moo
+--- no_error_log
+[error]
