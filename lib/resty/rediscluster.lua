@@ -57,8 +57,11 @@ local cluster_invalid_cmds = {
     ["shutdown"] = true
 }
 
-local function redis_slot(str)
-    return redis_crc(parse_key(str))
+local function redis_slot(key)
+    if key == "no_key" then
+        return 1
+    end
+    return redis_crc(parse_key(key))
 end
 
 local function check_auth(self, redis_client)
@@ -120,7 +123,7 @@ local function update_slots_and_servers(self, slots_info)
         end
     end
 
-    --ngx.log(ngx.NOTICE, "finished initializing slotcache...")
+    --ngx.log(ngx.NOTICE, "finished initializing slot cache...")
     slot_cache[self.config.name] = slots
     slot_cache[self.config.name .. "serv_list"] = servers
 end
@@ -180,9 +183,9 @@ local function try_hosts_slots(self, serv_list)
         end
 
         if ok then
-            local _, autherr = check_auth(self, redis_client)
-            if autherr then
-                table_insert(errors, autherr)
+            local _, auth_err = check_auth(self, redis_client)
+            if auth_err then
+                table_insert(errors, auth_err)
                 return nil, errors
             end
 
@@ -195,11 +198,11 @@ local function try_hosts_slots(self, serv_list)
             end
 
             -- cache master nodes
-            local nodes_res, nerr = redis_client:cluster("nodes")
+            local nodes_res, nodes_err = redis_client:cluster("nodes")
             if nodes_res then
                 cache_master_nodes(nodes_res)
             else
-                table_insert(errors, nerr)
+                table_insert(errors, nodes_err)
             end
             release_connection(redis_client, config)
 
@@ -326,89 +329,58 @@ function _M.new(_, config)
         return nil, "redis cluster config serv_list is empty"
     end
 
-    local inst = { config = config }
-    inst = setmetatable(inst, mt)
-    local _, err = inst:init_slots()
+    local instance = { config = config }
+    instance = setmetatable(instance, mt)
+    local _, err = instance:init_slots()
     if err then
         return nil, err
     end
-    return inst
+    return instance
 end
 
-local function pick_node(self, serv_list, slot, magic_radom_seed)
-    local host, port, slave, index
+local function pick_node(self, serv_list, magic_random_seed)
     if #serv_list < 1 then
-        return nil, nil, nil, "serv_list for slot " .. slot .. " is empty"
+        return nil, nil, nil, "serv_list is empty"
     end
 
-    if self.config.enable_slave_read then
-        if magic_radom_seed then
-            index = magic_radom_seed % #serv_list + 1
-        else
-            index = math.random(#serv_list)
-        end
-        host = serv_list[index].ip
-        port = serv_list[index].port
-
-        --cluster slots will always put the master node as first
-        if index > 1 then
-            slave = true
-        else
-            slave = false
-        end
-        --ngx.log(ngx.NOTICE, "pickup node: ", c(serv_list[index]))
-    else
-        host = serv_list[1].ip
-        port = serv_list[1].port
-        slave = false
+    if not self.config.enable_slave_read then
         --ngx.log(ngx.NOTICE, "pickup node: ", cjson.encode(serv_list[1]))
+        return serv_list[1].ip, serv_list[1].port, false
     end
-    return host, port, slave
+
+    local index
+    if magic_random_seed then
+        index = magic_random_seed % #serv_list + 1
+    else
+        index = math.random(#serv_list)
+    end
+
+    --cluster slots will always put the master node as first
+    return serv_list[index].ip, serv_list[index].port, index > 1
 end
 
-local ask_host_and_port = {}
-
-local function parse_ask_signal(res)
+local function parse_signal(res, prefix)
     --ask signal sample:ASK 12191 127.0.0.1:7008, so we need to parse and get 127.0.0.1, 7008
     if res ~= ngx.null then
-        if type(res) == "string" and string.sub(res, 1, 3) == "ASK" then
-            local matched = ngx.re.match(res, [[^ASK [^ ]+ ([^:]+):([^ ]+)]], "jo", nil, ask_host_and_port)
-            if not matched then
-                return nil, nil
-            end
-            return matched[1], matched[2]
+        if type(res) == "string" then
+            res = { res }
         end
 
         if type(res) == "table" then
             for i = 1, #res do
-                if type(res[i]) == "string" and string.sub(res[i], 1, 3) == "ASK" then
-                    local matched = ngx.re.match(res[i], [[^ASK [^ ]+ ([^:]+):([^ ]+)]], "jo", nil, ask_host_and_port)
+                if type(res[i]) == "string" and string.sub(res[i], 1, #prefix) == prefix then
+                    local matched = ngx.re.match(string.sub(#prefix + 1), "^ [^ ]+ ([^:]+):([^ ]+)", "jo", nil, nil)
                     if not matched then
-                        return nil, nil
+                        ngx.log(ngx.ERR, "failed to parse redirection host and port. msg is: ", res[i])
+                        return nil, nil, "failed to parse redirection host and port"
                     end
                     return matched[1], matched[2]
                 end
             end
         end
     end
-    return nil, nil
-end
 
-local function has_moved_signal(res)
-    if res ~= ngx.null then
-        if type(res) == "string" and string.sub(res, 1, 5) == "MOVED" then
-            return true
-        else
-            if type(res) == "table" then
-                for i = 1, #res do
-                    if type(res[i]) == "string" and string.sub(res[i], 1, 5) == "MOVED" then
-                        return true
-                    end
-                end
-            end
-        end
-    end
-    return false
+    return nil, nil
 end
 
 local function handle_command_with_retry(self, target_ip, target_port, asking, cmd, key, ...)
@@ -428,7 +400,7 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
         local serv_list = slots[slot].serv_list
 
         -- We must empty local reference to slots cache, otherwise there will be memory issue while
-        -- coroutine swich happens(eg. ngx.sleep, cosocket), very important!
+        -- coroutine switch happens(eg. ngx.sleep, cosocket), very important!
         slots = nil
 
         local ip, port, slave, err
@@ -437,9 +409,9 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
             -- asking redirection should only happens at master nodes
             ip, port, slave = target_ip, target_port, false
         else
-            ip, port, slave, err = pick_node(self, serv_list, slot)
+            ip, port, slave, err = pick_node(self, serv_list)
             if err then
-                ngx.log(ngx.ERR, "pickup node failed, will return failed for this request, meanwhile refereshing slotcache " .. err)
+                ngx.log(ngx.ERR, "pickup node failed, will return failed for this request. meanwhile refreshing slot cache " .. err)
                 self:refresh_slots()
                 return nil, err
             end
@@ -449,12 +421,12 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
         redis_client:set_timeouts(config.connect_timeout or DEFAULT_CONNECTION_TIMEOUT,
                 config.send_timeout or DEFAULT_SEND_TIMEOUT,
                 config.read_timeout or DEFAULT_READ_TIMEOUT)
-        local ok, connerr = redis_client:connect(ip, port, self.config.connect_opts)
+        local ok, connect_err = redis_client:connect(ip, port, self.config.connect_opts)
 
         if ok then
-            local _, autherr = check_auth(self, redis_client)
-            if autherr then
-                return nil, autherr
+            local _, auth_err = check_auth(self, redis_client)
+            if auth_err then
+                return nil, auth_err
             end
             if slave then
                 --set readonly
@@ -474,7 +446,6 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
                 end
             end
 
-            local need_to_retry = false
             local res
             if cmd == "eval" or cmd == "evalsha" then
                 res, err = redis_client[cmd](redis_client, ...)
@@ -482,66 +453,68 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
                 res, err = redis_client[cmd](redis_client, key, ...)
             end
 
-            if err then
-                if string.sub(err, 1, 5) == "MOVED" then
-                    --ngx.log(ngx.NOTICE, "found MOVED signal, trigger retry for normal commands, cmd: " .. cmd .. ", key: " .. key)
-                    local start, _, moved_ip, moved_port = err:find("MOVED%s+%d+%s+([^:]+):(%d+)")
-                    if start and moved_ip == ip and moved_port == tostring(port) then
-                        -- there's some issue with connection returning bad responses continously
-                        -- even though this node is the master of the data.
-                        -- close it instead of returning to pool
-                        local _, close_err = redis_client:close()
-                        if close_err then
-                            ngx.log(ngx.ERR, "close connection failed: ", close_err)
-                            return nil, "failed to close Redis connection!"
-                        end
-                    else
-                        release_connection(redis_client, config)
-                    end
+            if not err then
+                release_connection(redis_client, config)
+                return res, err
+            end
 
-                    --if retry with moved, we will not ask to specific ip,port anymore
-                    target_ip = nil
-                    target_port = nil
-                    self:refresh_slots()
-                    need_to_retry = true
-                elseif string.sub(err, 1, 3) == "ASK" then
+            local moved_host, moved_port, moved_err = parse_signal(err, "MOVED")
+            if moved_err or (moved_host ~= nil and moved_port ~= nil) then
+                --ngx.log(ngx.NOTICE, "found MOVED signal, trigger retry for normal commands. cmd: " .. cmd .. ", key: " .. key)
+                if moved_host == ip and moved_port == tostring(port) then
+                    -- there's some issue with connection returning bad responses continuously
+                    -- even though this node is the master of the data.
+                    -- close it instead of returning to pool
+                    local _, close_err = redis_client:close()
+                    if close_err then
+                        ngx.log(ngx.ERR, "close connection failed: ", close_err)
+                        return nil, "failed to close redis connection!"
+                    end
+                else
+                    release_connection(redis_client, config)
+                end
+
+                target_ip = moved_host
+                target_port = moved_port
+                self:refresh_slots()
+            else
+                local ask_host, ask_port, ask_err = parse_signal(err, "ASK")
+                if ask_err then
+                    return nil, ask_err
+                end
+
+                if ask_host ~= nil and ask_port ~= nil then
                     --ngx.log(ngx.NOTICE, "handle asking for normal commands, cmd: " .. cmd .. ", key: " .. key)
                     release_connection(redis_client, config)
 
                     if asking then
-                        --Should not happen after asking target ip,port and still return ask, if so, return error.
+                        --Should not happen after asking target ip,port and still return ask, if so, return error
                         return nil, "nested asking redirection occurred, client cannot retry"
-                    else
-                        local ask_host, ask_port = parse_ask_signal(err)
-
-                        if ask_host ~= nil and ask_port ~= nil then
-                            return handle_command_with_retry(self, ask_host, ask_port, true, cmd, key, ...)
-                        else
-                            return nil, "cannot parse ask redirection host and port: msg is " .. err
-                        end
                     end
+
+                    target_ip = ask_host
+                    target_port = ask_port
+                    asking = true
                 elseif string.sub(err, 1, 11) == "CLUSTERDOWN" then
+                    release_connection(redis_client, config)
                     return nil, "cannot execute command, cluster status is failed!"
                 else
-                    --There might be node fail, we should also refresh slot cache
+                    release_connection(redis_client, config)
+                    --There might be a node fail, we should also refresh slot cache
                     self:refresh_slots()
                     return nil, err
                 end
             end
-
-            if not need_to_retry then
-                release_connection(redis_client, config)
-                return res, err
-            end
         else
-            --There might be node fail, we should also refresh slot cache
+            --There might be a node fail, we should also refresh slot cache
             self:refresh_slots()
             if k == config.max_redirection or k == DEFAULT_MAX_REDIRECTION then
                 -- only return after allowing for `k` attempts
-                return nil, connerr
+                return nil, connect_err
             end
         end
     end
+
     return nil, "failed to execute command, reached maximum redirection attempts"
 end
 
@@ -550,8 +523,8 @@ local function generate_magic_seed(self)
     -- we always want pick up specific 3 nodes for pipeline requests, instead of 9.
     -- Currently we simply use (num of allnode)%count as a randomly fetch. Might consider a better way in the future.
     -- Use the dynamic serv_list instead of the static config serv_list
-    local nodeCount = #slot_cache[self.config.name .. "serv_list"].serv_list
-    return math.random(nodeCount)
+    local node_count = #slot_cache[self.config.name .. "serv_list"].serv_list
+    return math.random(node_count)
 end
 
 local function _do_cmd_master(self, cmd, key, ...)
@@ -579,11 +552,11 @@ local function _do_cmd(self, cmd, key, ...)
         return nil, "command not supported"
     end
 
+    -- check if we're in middle of pipeline
     local _reqs = rawget(self, "_reqs")
     if _reqs then
-        local args = { ... }
-        local t = { cmd = cmd, key = key, args = args }
-        table_insert(_reqs, t)
+        local execution = { cmd = cmd, key = key, args = { ... } }
+        table_insert(_reqs, execution)
         return
     end
 
@@ -595,8 +568,8 @@ local function _do_cmd(self, cmd, key, ...)
 end
 
 local function construct_final_pipeline_resp(self, node_res_map, node_req_map)
-    --construct final result with origin index
-    local finalret = {}
+    --construct final result with original index
+    local final_response = {}
     for k, v in pairs(node_res_map) do
         local reqs = node_req_map[k].reqs
         local res = v
@@ -604,34 +577,43 @@ local function construct_final_pipeline_resp(self, node_res_map, node_req_map)
 
         for i = 1, #reqs do
             --deal with redis cluster ask redirection
-            local ask_host, ask_port = parse_ask_signal(res[i])
+            local ask_host, ask_port, ask_err = parse_signal(res[i], "ASK")
+            if ask_err then
+                return nil, ask_err
+            end
+
             if ask_host ~= nil and ask_port ~= nil then
-                --ngx.log(ngx.NOTICE, "handle ask signal for cmd:" .. reqs[i]["cmd"] .. " key:" .. reqs[i]["key"] .. " target host:" .. ask_host .. " target port:" .. ask_port)
-                local askres, err = handle_command_with_retry(self, ask_host, ask_port, true, reqs[i]["cmd"], reqs[i]["key"], unpack(reqs[i]["args"]))
+                --ngx.log(ngx.NOTICE, "handle ask signal for cmd: " .. reqs[i]["cmd"] .. ", key: " .. reqs[i]["key"] .. ", target host: " .. ask_host .. ", target port: " .. ask_port)
+                local ask_res, err = handle_command_with_retry(self, ask_host, ask_port, true, reqs[i]["cmd"], reqs[i]["key"], unpack(reqs[i]["args"]))
                 if err then
                     return nil, err
-                else
-                    finalret[reqs[i].origin_index] = askres
                 end
-            elseif has_moved_signal(res[i]) then
-                --ngx.log(ngx.NOTICE, "handle moved signal for cmd:" .. reqs[i]["cmd"] .. " key:" .. reqs[i]["key"])
-                if need_to_fetch_slots then
-                    -- if there are multiple signals for moved, we just need to fetch slot cache once, and do retry.
-                    self:refresh_slots()
-                    need_to_fetch_slots = false
-                end
-                local movedres, err = handle_command_with_retry(self, nil, nil, false, reqs[i]["cmd"], reqs[i]["key"], unpack(reqs[i]["args"]))
-                if err then
-                    return nil, err
-                else
-                    finalret[reqs[i].origin_index] = movedres
-                end
+
+                final_response[reqs[i].origin_index] = ask_res
             else
-                finalret[reqs[i].origin_index] = res[i]
+                local moved_host, moved_port, moved_err = parse_signal(res[i], "MOVED")
+                if moved_err or (moved_host ~= nil and moved_port ~= nil) then
+                    --ngx.log(ngx.NOTICE, "handle moved signal for cmd: " .. reqs[i]["cmd"] .. ", key: " .. reqs[i]["key"])
+                    if need_to_fetch_slots then
+                        -- if there are multiple signals for moved, we just need to fetch slot cache once and retry
+                        self:refresh_slots()
+                        need_to_fetch_slots = false
+                    end
+
+                    local moved_res, err = handle_command_with_retry(self, moved_host, moved_port, false, reqs[i]["cmd"], reqs[i]["key"], unpack(reqs[i]["args"]))
+                    if err then
+                        return nil, err
+                    end
+
+                    final_response[reqs[i].origin_index] = moved_res
+                else
+                    final_response[reqs[i].origin_index] = res[i]
+                end
             end
         end
     end
-    return finalret
+
+    return final_response
 end
 
 local function has_cluster_fail_signal_in_pipeline(res)
@@ -667,12 +649,12 @@ function _M.commit_pipeline(self)
 
     local node_res_map = {}
     local node_req_map = {}
-    local magicRandomPickupSeed = generate_magic_seed(self)
+    local magic_random_seed = generate_magic_seed(self)
 
     --construct req to real node mapping
     for i = 1, #_reqs do
-        -- Because we will forward req to different nodes, so the result will not be the origin order,
-        -- we need to record the original index and finally we can construct the result with origin order
+        -- Because we forward requests to different nodes, the result might not be the original order,
+        -- we need to record the original index to be able to later construct the result with original order
         _reqs[i].origin_index = i
         local key = _reqs[i].key
         local slot = redis_slot(tostring(key))
@@ -681,7 +663,7 @@ function _M.commit_pipeline(self)
         end
         local slot_item = slots[slot]
 
-        local ip, port, slave, err = pick_node(self, slot_item.serv_list, slot, magicRandomPickupSeed)
+        local ip, port, slave, err = pick_node(self, slot_item.serv_list, magic_random_seed)
         if err then
             -- We must empty local reference to slots cache, otherwise there will be memory issue while
             -- coroutine switch happens (e.g. ngx.sleep, cosocket), very important!
@@ -715,9 +697,9 @@ function _M.commit_pipeline(self)
         local ok, err = redis_client:connect(ip, port, self.config.connect_opts)
 
         if ok then
-            local _, autherr = check_auth(self, redis_client)
-            if autherr then
-                return nil, autherr
+            local _, auth_err = check_auth(self, redis_client)
+            if auth_err then
+                return nil, auth_err
             end
 
             if slave then
@@ -753,6 +735,7 @@ function _M.commit_pipeline(self)
             if has_cluster_fail_signal_in_pipeline(res) then
                 return nil, "cannot execute pipeline command, cluster status is failed!"
             end
+
             release_connection(redis_client, config)
             node_res_map[k] = res
         else
@@ -762,7 +745,7 @@ function _M.commit_pipeline(self)
         end
     end
 
-    --construct final result with origin index
+    --construct final result with original index
     local final_res, err = construct_final_pipeline_resp(self, node_res_map, node_req_map)
     if not err then
         return final_res
@@ -789,7 +772,7 @@ local function _do_eval_cmd(self, cmd, ...)
     if keys_num > 1 then
         return nil, "cannot execute eval with more than one keys for redis cluster"
     end
-    local key = args[3] or "no_key"
+    local key = (keys_num == 1 and args[3]) or "no_key"
     return _do_cmd(self, cmd, key, ...)
 end
 
