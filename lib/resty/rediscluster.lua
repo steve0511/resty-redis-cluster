@@ -369,7 +369,7 @@ local function parse_signal(res, prefix)
         if type(res) == "table" then
             for i = 1, #res do
                 if type(res[i]) == "string" and string.sub(res[i], 1, #prefix) == prefix then
-                    local matched = ngx.re.match(string.sub(#prefix + 1), "^ [^ ]+ ([^:]+):([^ ]+)", "jo", nil, nil)
+                    local matched = ngx.re.match(string.sub(res[i], #prefix + 1), "^ [^ ]+ ([^:]+):([^ ]+)", "jo", nil, nil)
                     if not matched then
                         ngx.log(ngx.ERR, "failed to parse redirection host and port. msg is: ", res[i])
                         return nil, nil, "failed to parse redirection host and port"
