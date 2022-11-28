@@ -52,8 +52,9 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 2. nginx.conf add config:
 
    lua_shared_dict redis_cluster_slot_locks 100k;
+   lua_shared_dict redis_cluster_slots_info 100k;
    
-3. or install by luarock, link: https://luarocks.org/modules/steve0511/resty-redis-cluster 
+4. or install by luarock, link: https://luarocks.org/modules/steve0511/resty-redis-cluster 
 
 ### Sample usage
 
@@ -61,10 +62,11 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 
 ```lua
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
-    name = "testCluster",                   --rediscluster name
-    serv_list = {                           --redis cluster node list(host and port),
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
+    name = "testCluster",                     --rediscluster name
+    serv_list = {                             --redis cluster node list (host and port)
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
         { ip = "127.0.0.1", port = 7003 },
@@ -72,11 +74,11 @@ local config = {
         { ip = "127.0.0.1", port = 7005 },
         { ip = "127.0.0.1", port = 7006 }
     },
-    keepalive_timeout = 60000,              --redis connection pool idle timeout
-    keepalive_cons = 1000,                  --redis connection pool size
-    connect_timeout = 1000,              --timeout while connecting
-    max_redirection = 5,                    --maximum retry attempts for redirection
-    max_connection_attempts = 1             --maximum retry attempts for connection
+    keepalive_timeout = 60000,                --redis connection pool idle timeout
+    keepalive_cons = 1000,                    --redis connection pool size
+    connect_timeout = 1000,                   --timeout while connecting
+    max_redirection = 5,                      --maximum retry attempts for redirection
+    max_connection_attempts = 1               --maximum retry attempts for connection
 }
 
 local redis_cluster = require "rediscluster"
@@ -93,10 +95,11 @@ end
   
 ```lua
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
-    name = "testCluster",                   --rediscluster name
-    serv_list = {                           --redis cluster node list(host and port),
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    name = "testCluster",                     --rediscluster name
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
+    serv_list = {                             --redis cluster node list (host and port)
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
         { ip = "127.0.0.1", port = 7003 },
@@ -104,14 +107,14 @@ local config = {
         { ip = "127.0.0.1", port = 7005 },
         { ip = "127.0.0.1", port = 7006 }
     },
-    keepalive_timeout = 60000,              --redis connection pool idle timeout
-    keepalive_cons = 1000,                  --redis connection pool size
-    connect_timeout = 1000,              --timeout while connecting
-    read_timeout = 1000,                    --timeout while reading
-    send_timeout = 1000,                    --timeout while sending
-    max_redirection = 5,                    --maximum retry attempts for redirection,
-    max_connection_attempts = 1,            --maximum retry attempts for connection
-    auth = "pass"                           --set password while setting auth
+    keepalive_timeout = 60000,                --redis connection pool idle timeout
+    keepalive_cons = 1000,                    --redis connection pool size
+    connect_timeout = 1000,                   --timeout while connecting
+    read_timeout = 1000,                      --timeout while reading
+    send_timeout = 1000,                      --timeout while sending
+    max_redirection = 5,                      --maximum retry attempts for redirection
+    max_connection_attempts = 1,              --maximum retry attempts for connection
+    auth = "pass"                             --set password while setting auth
 }
 
 local redis_cluster = require "rediscluster"
@@ -131,8 +134,9 @@ end
 local cjson = require "cjson"
 
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
     name = "testCluster",
     serv_list = {
         { ip = "127.0.0.1", port = 7001 },
@@ -181,8 +185,9 @@ end
 local cjson = require "cjson"
 
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
     name = "testCluster",
     enable_slave_read = true,
     serv_list = {
@@ -218,8 +223,9 @@ end
 local cjson = require "cjson"
 
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
     name = "testCluster",
     enable_slave_read = true,
     serv_list = {
@@ -261,10 +267,11 @@ end
 
 ```lua
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
-    name = "testCluster",                   --rediscluster name
-    serv_list = {                           --redis cluster node list(host and port),
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
+    name = "testCluster",                     --rediscluster name
+    serv_list = {                             --redis cluster node list (host and port)
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
         { ip = "127.0.0.1", port = 7003 },
@@ -272,13 +279,13 @@ local config = {
         { ip = "127.0.0.1", port = 7005 },
         { ip = "127.0.0.1", port = 7006 }
     },
-    keepalive_timeout = 60000,              --redis connection pool idle timeout
-    keepalive_cons = 1000,                  --redis connection pool size
-    connect_timeout = 1000,              --timeout while connecting
-    read_timeout = 1000,                    --timeout while reading
-    send_timeout = 1000,                    --timeout while sending
-    max_redirection = 5,                    --maximum retry attempts for redirection
-    max_connection_attempts = 1             --maximum retry attempts for connection
+    keepalive_timeout = 60000,                --redis connection pool idle timeout
+    keepalive_cons = 1000,                    --redis connection pool size
+    connect_timeout = 1000,                   --timeout while connecting
+    read_timeout = 1000,                      --timeout while reading
+    send_timeout = 1000,                      --timeout while sending
+    max_redirection = 5,                      --maximum retry attempts for redirection
+    max_connection_attempts = 1               --maximum retry attempts for connection
 }
 
 local redis_cluster = require "rediscluster"
@@ -298,10 +305,11 @@ end
 
 ```lua
 local config = {
-    dict_name = "test_locks",               --shared dictionary name for locks, if default value is not used 
-    refresh_lock_key = "refresh_lock",      --shared dictionary name prefix for lock of each worker, if default value is not used 
-    name = "testCluster",                   --rediscluster name
-    serv_list = {                           --redis cluster node list(host and port),
+    dict_name = "test_locks",                 --shared dictionary name for locks, if default value is not used
+    refresh_lock_key = "refresh_lock",        --shared dictionary name prefix for lock of each worker, if default value is not used
+    slots_info_dict_name = "test_slots_info", --shared dictionary name for slots_info
+    name = "testCluster",                     --rediscluster name
+    serv_list = {                             --redis cluster node list (host and port)
         { ip = "127.0.0.1", port = 7001 },
         { ip = "127.0.0.1", port = 7002 },
         { ip = "127.0.0.1", port = 7003 },
@@ -309,11 +317,11 @@ local config = {
         { ip = "127.0.0.1", port = 7005 },
         { ip = "127.0.0.1", port = 7006 }
     },
-    keepalive_timeout = 60000,              --redis connection pool idle timeout
-    keepalive_cons = 1000,                  --redis connection pool size
-    connect_timeout = 1000,              --timeout while connecting
-    max_redirection = 5,                    --maximum retry attempts for redirection
-    max_connection_attempts = 1,             --maximum retry attempts for connection
+    keepalive_timeout = 60000,                --redis connection pool idle timeout
+    keepalive_cons = 1000,                    --redis connection pool size
+    connect_timeout = 1000,                   --timeout while connecting
+    max_redirection = 5,                      --maximum retry attempts for redirection
+    max_connection_attempts = 1,              --maximum retry attempts for connection
     connect_opts = {
         ssl = true,
         ssl_verify = true,
