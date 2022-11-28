@@ -91,7 +91,7 @@ local function release_connection(red, config)
     end
 end
 
-local function generate_full_slots_cache_info(self, slots_info)
+local function generate_full_slots_cache_info(slots_info)
     local slots = {}
     -- while slots are updated, create a list of servers present in cluster
     -- this can differ from self.config.serv_list if a cluster is resized (added/removed nodes)
@@ -120,9 +120,7 @@ local function generate_full_slots_cache_info(self, slots_info)
         end
     end
 
-    --ngx.log(ngx.NOTICE, "finished initializing slot cache...")
-    slot_cache[self.config.name] = slots
-    slot_cache[self.config.name .. "serv_list"] = servers
+    return slots, servers
 end
 
 local function try_hosts_slots(self, serv_list)
@@ -169,10 +167,14 @@ local function try_hosts_slots(self, serv_list)
                 return nil, errors
             end
 
-            local slots_info
-            slots_info, err = redis_client:cluster("slots")
+            local slots_info, slots_err = redis_client:cluster("slots")
+            release_connection(redis_client, config)
+
             if slots_info then
-                generate_full_slots_cache_info(self, slots_info)
+                local slots, servers = generate_full_slots_cache_info(slots_info)
+                --ngx.log(ngx.NOTICE, "finished initializing slot cache...")
+                slot_cache[self.config.name] = slots
+                slot_cache[self.config.name .. "serv_list"] = servers
 
                 -- cache slots_info to memory
                 _, err = self:try_cache_slots_info_to_memory(slots_info)
@@ -180,10 +182,10 @@ local function try_hosts_slots(self, serv_list)
                     ngx.log(ngx.ERR, 'failed to cache slots to memory: ', err)
                 end
             else
-                table_insert(errors, err)
+                table_insert(errors, slots_err)
             end
 
-            -- refresh of slots successful
+            -- refreshed slots successfully
             -- not required to connect/iterate over additional hosts
             if slots_info then
                 return true, nil
@@ -193,61 +195,12 @@ local function try_hosts_slots(self, serv_list)
         else
             table_insert(errors, err)
         end
+
         if #errors == 0 then
             return true, nil
         end
     end
     return nil, errors
-end
-
-function _M.try_load_slots_from_memory_cache(self)
-    local dict_name = self.config.slots_info_dict_name or DEFAULT_SLOTS_INFO_DICT_NAME
-    local slots_cache_dict = ngx.shared[dict_name]
-    if slots_cache_dict == nil then
-        return false, dict_name .. ' is nil'
-    end
-
-    local slots_info_str = slots_cache_dict:get(self.config.name)
-    if not slots_info_str or slots_info_str == '' then
-        ngx.log(ngx.ERR, 'slots_info_str: ', slots_info_str)
-        return false, 'slots_info_str is nil or empty'
-    end
-
-    local slots_info = cjson.decode(slots_info_str)
-    if not slots_info then
-        return false, 'slots_info is nil'
-    end
-
-    local slots, servers = generate_full_slots_cache_info(slots_info)
-    if not slots or not servers then
-        return false, 'slots or servers is nil'
-    end
-
-    --ngx.log(ngx.NOTICE, "finished initializing slotcache...")
-    slot_cache[self.config.name] = slots
-    slot_cache[self.config.name .. "serv_list"] = servers
-
-    return true
-end
-
-function _M.try_cache_slots_info_to_memory(self, slots_info)
-    local dict_name = self.config.slots_info_dict_name or DEFAULT_SLOTS_INFO_DICT_NAME
-    local slots_cache_dict = ngx.shared[dict_name]
-    if slots_cache_dict == nil then
-        return false, dict_name .. ' is nil'
-    end
-
-    if not slots_info then
-        return false, 'slots_info is nil'
-    end
-
-    local slots_info_str = cjson.encode(slots_info)
-    local success, err = slots_cache_dict:set(self.config.name, slots_info_str)
-    if not success then
-        ngx.log(ngx.ERR, 'error set slots_info: ', err, ', slots_info_str: ', slots_info_str)
-        return false, err
-    end
-    return true
 end
 
 function _M.fetch_slots(self)
@@ -277,6 +230,54 @@ function _M.fetch_slots(self)
         ngx.log(ngx.ERR, err)
         return nil, err
     end
+end
+
+function _M.try_load_slots_from_memory_cache(self)
+    local dict_name = self.config.slots_info_dict_name or DEFAULT_SLOTS_INFO_DICT_NAME
+    local slots_cache_dict = ngx.shared[dict_name]
+    if slots_cache_dict == nil then
+        return false, dict_name .. ' is nil'
+    end
+
+    local slots_info_str = slots_cache_dict:get(self.config.name)
+    if not slots_info_str or slots_info_str == '' then
+        return false, 'slots_info_str is nil or empty'
+    end
+
+    local slots_info = cjson.decode(slots_info_str)
+    if not slots_info then
+        return false, 'slots_info is nil'
+    end
+
+    local slots, servers = generate_full_slots_cache_info(slots_info)
+    if not slots or not servers then
+        return false, 'slots or servers is nil'
+    end
+
+    --ngx.log(ngx.NOTICE, "finished initializing slot cache...")
+    slot_cache[self.config.name] = slots
+    slot_cache[self.config.name .. "serv_list"] = servers
+    return true
+end
+
+function _M.try_cache_slots_info_to_memory(self, slots_info)
+    local dict_name = self.config.slots_info_dict_name or DEFAULT_SLOTS_INFO_DICT_NAME
+    local slots_cache_dict = ngx.shared[dict_name]
+    if slots_cache_dict == nil then
+        return false, dict_name .. ' is nil'
+    end
+
+    if not slots_info then
+        return false, 'slots_info is nil'
+    end
+
+    local slots_info_str = cjson.encode(slots_info)
+    local success, err = slots_cache_dict:set(self.config.name, slots_info_str)
+    if not success then
+        ngx.log(ngx.ERR, 'error set slots_info: ', err, ', slots_info_str: ', slots_info_str)
+        return false, err
+    end
+    return true
 end
 
 function _M.refresh_slots(self)
@@ -331,15 +332,12 @@ function _M.init_slots(self)
         return true
     end
 
-    -- fetch slots from memory cache
+    -- try to fetch slots from memory cache
     ok, err = self:try_load_slots_from_memory_cache()
-    if err then
-        ngx.log(ngx.ERR, 'failed to fetch slots from memory cache: ', err)
-    end
     if ok then
         ok, err = lock:unlock()
         if not ok then
-            ngx.log(ngx.ERR, "failed to unlock in initialization slot cache:", err)
+            ngx.log(ngx.ERR, "failed to unlock in initialization slot cache: ", err)
         end
         return true
     end
@@ -540,19 +538,20 @@ local function handle_command_with_retry(self, target_ip, target_port, asking, c
                     return nil, "cannot execute command, cluster status is failed!"
                 else
                     release_connection(redis_client, config)
-                    --There might be a node fail, we should also refresh slot cache
+                    -- There might be a node failure, we should also refresh slot cache
                     self:refresh_slots()
                     return nil, err
                 end
             end
         else
-            -- There might be node fail, we should also refresh slot cache
             -- `too many waiting connect operations` means queued connect operations is out of backlog
             -- `timeout` means timeout while wait for connection release
             -- If connect timeout caused by server's issue, the connect_err is `connection timed out`
             if connect_err ~= TOO_MANY_CONNECTIONS and connect_err ~= CONNECTION_POOL_TIMEOUT then
+                -- There might be a node failure, we should also refresh slot cache
                 self:refresh_slots()
             end
+
             if k == config.max_redirection or k == DEFAULT_MAX_REDIRECTION then
                 -- only return after allowing for `k` attempts
                 return nil, connect_err
@@ -777,23 +776,23 @@ function _M.commit_pipeline(self)
 
             local res, commit_err = redis_client:commit_pipeline()
             if commit_err then
-                --There might be a node fail, we should also refresh slot cache
+                -- There might be a node failure, we should also refresh slot cache
                 self:refresh_slots()
                 return nil, commit_err .. " returned from " .. tostring(ip) .. ":" .. tostring(port)
             end
 
+            release_connection(redis_client, config)
             if has_cluster_fail_signal_in_pipeline(res) then
                 return nil, "cannot execute pipeline command, cluster status is failed!"
             end
 
-            release_connection(redis_client, config)
             node_res_map[k] = res
         else
-            -- There might be node fail, we should also refresh slot cache
             -- `too many waiting connect operations` means queued connect operations is out of backlog
             -- `timeout` means timeout while wait for connection release
             -- If connect timeout caused by server's issue, the connect_err is `connection timed out`
             if connect_err ~= TOO_MANY_CONNECTIONS and connect_err ~= CONNECTION_POOL_TIMEOUT then
+                -- There might be a node failure, we should also refresh slot cache
                 self:refresh_slots()
             end
             return nil, connect_err .. " pipeline commit failed while connecting to " .. tostring(ip) .. ":" .. tostring(port)
@@ -802,11 +801,10 @@ function _M.commit_pipeline(self)
 
     --construct final result with original index
     local final_res, err = construct_final_pipeline_resp(self, node_res_map, node_req_map)
-    if not err then
-        return final_res
-    else
+    if err then
         return nil, err .. " failed to construct final pipeline result"
     end
+    return final_res
 end
 
 function _M.cancel_pipeline(self)
@@ -827,6 +825,7 @@ local function _do_eval_cmd(self, cmd, ...)
     if keys_num > 1 then
         return nil, "cannot execute eval with more than one keys for redis cluster"
     end
+
     local key = (keys_num == 1 and args[3]) or "no_key"
     return _do_cmd(self, cmd, key, ...)
 end
