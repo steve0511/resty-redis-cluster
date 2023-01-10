@@ -76,6 +76,25 @@ local function check_auth(self, redis_client)
             return nil, err
         end
 
+    -- redis 6.x adds support for username+password combination
+    elseif type(self.config.password) == "string" then
+        local count, err = redis_client:get_reused_times()
+        if count == 0 then
+            local _
+
+            if type(self.config.username) == "string" then
+                _, err = redis_client:auth(self.config.username, self.config.password)
+            else
+                _, err = redis_client:auth(self.config.password)
+            end
+        end
+
+        if not err then
+            return true, nil
+        else
+            return nil, err
+        end
+
     else
         return true, nil
     end
