@@ -65,15 +65,30 @@ end
 local function check_auth(self, redis_client)
     if type(self.config.auth) == "string" then
         local count, err = redis_client:get_reused_times()
-        if count == 0 then
-            local _
-            _, err = redis_client:auth(self.config.auth)
+        if not count then
+            return nil, "failed getting reused count: " .. tostring(err)
+        elseif count > 0 then
+            return true, nil -- reusing the connection, so already authenticated
         end
+        return redis_client:auth(self.config.auth)
 
-        if not err then
-            return true, nil
+    -- redis 6.x adds support for username+password combination
+    elseif type(self.config.password) == "string" then
+        local count, err = redis_client:get_reused_times()
+        if not count then
+            return nil, "failed getting reused count: " .. tostring(err)
+        elseif count > 0 then
+            return true, nil -- reusing the connection, so already authenticated
+        end
+        
+        if self.config.username then
+            if self.config.username == "default" then
+                -- redis uses 'default' as the default username now for the pre-6 scheme
+                return nil, "'username' cannot be 'default'"
+            end
+            return redis_client:auth(self.config.username, self.config.password)
         else
-            return nil, err
+            return redis_client:auth(self.config.password)
         end
 
     else
