@@ -1017,3 +1017,65 @@ cat: meow
 cow: moo
 --- no_error_log
 [error]
+
+=== TEST 15: clear slot cache
+--- http_config eval: $::HttpConfig
+--- config
+    location /t {
+        content_by_lua '
+
+            local config = {
+                            name = "testCluster",                   --rediscluster name
+                            serv_list = {                           --redis cluster node list(host and port),
+                                            { ip = "127.0.0.1", port = 6381 },
+                                            { ip = "127.0.0.1", port = 6382 },
+                                            { ip = "127.0.0.1", port = 6383 },
+                                            { ip = "127.0.0.1", port = 6384 },
+                                            { ip = "127.0.0.1", port = 6385 },
+                                            { ip = "127.0.0.1", port = 6386 },
+                                            { ip = "127.0.0.1", port = 6387 }
+                                        },
+                            keepalive_timeout = 60000,              --redis connection pool idle timeout
+                            keepalive_cons = 1000,                  --redis connection pool size
+                            connect_timeout = 1000,                 --timeout while connecting
+                            read_timeout = 1000,                    --timeout while reading
+                            send_timeout = 1000,                    --timeout while sending
+                            max_redirection = 5                     --maximum retry attempts for redirection
+
+            }
+            local redis_cluster = require "resty.rediscluster"
+            local rc_c, err = redis_cluster:new(config)
+            if err then
+                ngx.say("failed to create: ", err)
+                return
+            end
+
+            local res, err = rc_c:set("dog", "an animal")
+            if not res then
+                ngx.say("failed to set dog: ", err)
+                return
+            end
+            ngx.say("set dog: ", res)
+
+            red_c:init_pipeline()
+            rc_c:get("dog")
+            local res, err = red_c:commit_pipeline()
+            if err then
+                ngx.say("failed to get dog: ", err)
+                return
+            end
+            if not res then
+                ngx.say("dog not found.")
+                return
+            end
+            ngx.say("dog: ", res)
+        ';
+    }
+--- request
+GET /t
+--- response_body
+set dog: OK
+dog: an animal
+--- no_error_log
+[error]
+--- ONLY

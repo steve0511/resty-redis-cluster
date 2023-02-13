@@ -80,7 +80,7 @@ local function check_auth(self, redis_client)
         elseif count > 0 then
             return true, nil -- reusing the connection, so already authenticated
         end
-        
+
         if self.config.username then
             if self.config.username == "default" then
                 -- redis uses 'default' as the default username now for the pre-6 scheme
@@ -225,6 +225,12 @@ local function try_hosts_slots(self, serv_list)
 end
 
 
+local function clear_slot_cache(self)
+    slot_cache[self.config.name] = nil
+    slot_cache[self.config.name .. "serv_list"] = nil
+end
+
+
 function _M.fetch_slots(self)
     local serv_list = self.config.serv_list
     local serv_list_cached = slot_cache[self.config.name .. "serv_list"]
@@ -251,6 +257,9 @@ function _M.fetch_slots(self)
     if errors then
         local err = "failed to fetch slots: " .. table.concat(errors, ";")
         ngx.log(ngx.ERR, err)
+
+        -- clear cached Redis IP and slots info when Redis is down
+        clear_slot_cache(self)
         return nil, err
     end
 end
