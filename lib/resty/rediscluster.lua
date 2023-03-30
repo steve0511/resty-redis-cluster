@@ -18,7 +18,7 @@ local char = string.char
 local table_insert = table.insert
 local string_find = string.find
 local redis_crc = xmodem.redis_crc
-
+redis:register_module_prefix("json")
 local DEFAULT_SHARED_DICT_NAME = "redis_cluster_slot_locks"
 local DEFAULT_REFRESH_DICT_NAME = "refresh_lock"
 local DEFAULT_MAX_REDIRECTION = 5
