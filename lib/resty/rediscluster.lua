@@ -18,7 +18,7 @@ local char = string.char
 local table_insert = table.insert
 local string_find = string.find
 local redis_crc = xmodem.redis_crc
-
+redis:register_module_prefix("json")
 local DEFAULT_SHARED_DICT_NAME = "redis_cluster_slot_locks"
 local DEFAULT_REFRESH_DICT_NAME = "refresh_lock"
 local DEFAULT_MAX_REDIRECTION = 5
@@ -28,6 +28,8 @@ local DEFAULT_KEEPALIVE_CONS = 1000
 local DEFAULT_CONNECTION_TIMEOUT = 1000
 local DEFAULT_SEND_TIMEOUT = 1000
 local DEFAULT_READ_TIMEOUT = 1000
+
+
 
 local function parse_key(key_str)
     local left_tag_single_index = string_find(key_str, "{", 0)
@@ -57,6 +59,14 @@ local cluster_invalid_cmds = {
     ["config"] = true,
     ["shutdown"] = true
 }
+
+function _M.register_module_prefix(mod)
+    _M[mod] = function(self)
+        self._module_prefix = mod
+        return self
+    end
+end
+
 
 local function redis_slot(str)
     return redis_crc(parse_key(str))
@@ -578,6 +588,13 @@ local function _do_cmd(self, cmd, key, ...)
         return _do_cmd_master(self, cmd, key, ...)
     end
 
+    
+    local module_prefix = rawget(self, "_module_prefix")
+    if module_prefix then
+        self._module_prefix = nil
+        cmd = module_prefix .. "." .. cmd
+    end
+
     local res, err = handle_command_with_retry(self, nil, nil, false, cmd, key, ...)
     return res, err
 end
@@ -706,21 +723,20 @@ function _M.commit_pipeline(self)
                                   config.read_timeout or DEFAULT_READ_TIMEOUT)
         local ok, err = redis_client:connect(ip, port, self.config.connect_opts)
 
+        local authok, autherr = check_auth(self, redis_client)
+        if autherr then
+            return nil, autherr
+        end
+
+        if slave then
+            --set readonly
+            local ok, err = redis_client:readonly()
+            if not ok then
+                self:refresh_slots()
+                return nil, err
+            end
+        end
         if ok then
-            local authok, autherr = check_auth(self, redis_client)
-            if autherr then
-                return nil, autherr
-            end
-
-            if slave then
-                --set readonly
-                local ok, err = redis_client:readonly()
-                if not ok then
-                    self:refresh_slots()
-                    return nil, err
-                end
-            end
-
             redis_client:init_pipeline()
             for i = 1, #reqs do
                 local req = reqs[i]
