@@ -705,6 +705,9 @@ function _M.commit_pipeline(self)
                                   config.send_timeout or DEFAULT_SEND_TIMEOUT,
                                   config.read_timeout or DEFAULT_READ_TIMEOUT)
         local ok, err = redis_client:connect(ip, port, self.config.connect_opts)
+        if not ok then
+            return nil, "failed to connect, err: " .. err
+        end
 
         if ok then
             local authok, autherr = check_auth(self, redis_client)
