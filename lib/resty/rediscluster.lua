@@ -67,7 +67,11 @@ local function check_auth(self, redis_client)
         local count, err = redis_client:get_reused_times()
         if count == 0 then
             local _
-            _, err = redis_client:auth(self.config.auth)
+            if self.config.username then
+                _, err = redis_client:auth(self.config.username, self.config.auth)
+            else
+                _, err = redis_client:auth(self.config.auth)
+            end
         end
 
         if not err then
