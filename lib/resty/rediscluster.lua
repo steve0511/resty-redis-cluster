@@ -1458,6 +1458,73 @@ eval(script, 0, arg1, arg2 ...)
     local key = args[3] or "no_key"
     return _do_cmd(self, cmd, key, ...)
 end
+
+-- mget/mset: split the keys by slot, run one command per slot and merge the replies.
+-- A single slot (e.g. all keys share a hash tag) and pipelines take the plain path.
+local function _do_multi_key_cmd(self, cmd, ...)
+    -- a pipeline queues the call as it is
+    if rawget(self, "_reqs") then
+        return _do_cmd(self, cmd, ...)
+    end
+
+    local args = { ... }
+    local nargs = select("#", ...)
+    local step = cmd == "mset" and 2 or 1
+
+    if nargs == 0 or nargs % step ~= 0 then
+        return nil, "wrong number of arguments for '" .. cmd .. "' command"
+    end
+    for i = 1, nargs do
+        if args[i] == nil then
+            return nil, "nil argument for '" .. cmd .. "' command"
+        end
+    end
+
+    local groups, order = {}, {}
+    for i = 1, nargs, step do
+        local slot = redis_slot(tostring(args[i]))
+        local group = groups[slot]
+        if not group then
+            group = { args = {}, indexes = {} }
+            groups[slot] = group
+            order[#order + 1] = slot
+        end
+        local group_args = group.args
+        group_args[#group_args + 1] = args[i]
+        if step == 2 then
+            group_args[#group_args + 1] = args[i + 1]
+        end
+        group.indexes[#group.indexes + 1] = (i - 1) / step + 1
+    end
+
+    if #order == 1 then
+        return _do_cmd(self, cmd, ...)
+    end
+
+    local merged = {}
+    for _, slot in ipairs(order) do
+        local group = groups[slot]
+        local res, err = _do_cmd(self, cmd, unpack(group.args))
+        if err or not res then
+            return nil, err
+        end
+        if cmd == "mget" then
+            if type(res) ~= "table" then
+                return nil, "unexpected reply for 'mget' command"
+            end
+            for j, index in ipairs(group.indexes) do
+                merged[index] = res[j]
+            end
+        end
+    end
+
+    if cmd == "mset" then
+        return "OK"
+    end
+    return merged
+end
+
+
 -- dynamic cmd
 setmetatable(_M, {
     __index = function(_, cmd)
@@ -1465,6 +1532,8 @@ setmetatable(_M, {
         function(self, ...)
             if cmd == "eval" or cmd == "evalsha" then
                 return _do_eval_cmd(self, cmd, ...)
+            elseif cmd == "mget" or cmd == "mset" then
+                return _do_multi_key_cmd(self, cmd, ...)
             else
                 return _do_cmd(self, cmd, ...)
             end

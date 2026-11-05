@@ -21,6 +21,8 @@ While building the client, thanks for https://github.com/cuiweixie/lua-resty-red
 
 4. Support hashtag. Just give your key like name{tag}
 
+   `mget` and `mset` accept keys in different slots: the keys are split by slot, one command is sent per slot and the replies are merged in the original order. A cross-slot `mset` is not atomic, so an error can leave some slots written. Inside a pipeline these two commands still need all keys in one slot (use a hash tag).
+
 5. Support read from slave node by readonly mode, both usual command and pipeline. While enable slave node read, resty-redis-cluster will randomly pickup a node which is mapped to the request key, no matter it's master or slave.
 
 6. Support online resharding of redis cluster(both for usual command and pipeline. resty-redis-cluster will handle the #MOVED signal by re-cache the slot mapping and retrying. resty-redis-cluster will handle the #ASK signal by retrying with asking to redirection target nodes
